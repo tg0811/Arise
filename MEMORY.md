@@ -11,6 +11,7 @@ A personal, self-hosted **PWA** that turns daily life into a Solo Leveling–sty
 Built *for the owner*, fully customizable. Installed from the browser with "Add to Home screen" on Android.
 
 ## Hard rules (from the owner)
+- Git repo = `SoloLeveling/` only, pushed to `git@github.com:tg0811/Arise.git`. Never commit anything from outside this folder.
 - **No AI in the app.** No generation, no chat, nothing "AI slop". Every feature is manual and deterministic.
 - PWA only, no APK. Hosted on the owner's **Hetzner** server.
 - The owner must be able to **fall**: de-leveling and de-ranking are required.
@@ -71,6 +72,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - ❌ Reading other apps' screen time. The Veil is manual instead (decided).
 
 ## Progress
+- **2026-10-30**: Pushed to **github.com/tg0811/Arise** (private, branch `main`). Only `SoloLeveling/` is versioned: the repo root *is* this folder. The reference apps in `Arise/` stay out.
 - **2026-10-30**: **Phase 1 built and verified.** Backend has 9 passing tests (auth, gain = loss, floor at 0, de-leveling, 7-day multiplier, midnight auto-fail, weekday schedules, chains, boss/weekly boss, weight log). The real PWA build was walked end to end in headless Chromium at phone and desktop sizes with no console errors.
   Built: password setup/login, Awakening onboarding (name → photo → height/weight → covenant), Today (clear-progress bar with the 80% line, habits with Complete/Fail/Undo, quests with countdown/chain/boss/abandon/remove), create/edit sheet, Character (avatar aura, rank, level, mood, attributes, rank ladder), Settings (profile, photo, height, categories CRUD, logout), level-up/fallen splash, rank theming, PWA manifest + icons.
 - **2026-10-30**: Owner request: **height 167 cm and weight (75 kg, editable with a pen icon) shown wherever the avatar is** (header, Character, Settings). Weight is stored as a daily log (`weight_logs`, latest = current) so it can be charted later.
