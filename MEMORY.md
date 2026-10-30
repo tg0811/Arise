@@ -52,7 +52,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 2. ✅ **Goals & economy:** Major Goals (G1/G2), My State (G3), wallet, lootbox at 80%, store, real-world rewards, inventory, journal/AAR (R1).
 3. **History & insight:** Archive (overview/history/streaks), 28-day heatmap, KPI cards, weekly XP chart, System Mechanics page, titles (M7).
 4. **Feel & reach:** Web Push interval reminders + quiet hours (**reminders count only tasks scheduled *today*; a habit's rest days never notify; send nothing when all are done**; proposed: a per-habit nudge before its "by HH:MM" deadline, e.g. 30 min before, on scheduled days only. Needs the HTTPS deploy to test on the phone), focus timer (F1), level-up generative art + sound, rank ascension splash, S-rank cutscene, ambient particles, Awakening cinematic polish, backup/restore/typed-phrase reset.
-5. **Deploy:** Docker + Caddy on Hetzner.
+5. **Deploy:** Docker + Caddy on Hetzner. **The server currently has no TLS (noted 2026-10-31).** HTTPS is mandatory for PWA install, the service worker, push, and the Secure session cookie, so Caddy must terminate TLS with auto Let's Encrypt. No domain yet: use `<ip-with-dashes>.sslip.io`, or a domain/DuckDNS name if the owner gets one. Never expose the app on plain HTTP over the internet: the password would travel in clear text.
 
 ## Implementation notes (non-obvious)
 - Node runs `.ts` directly, so backend imports use `.ts` extensions and only erasable TS syntax (no enums or parameter properties). Shared code is imported by relative path (`../../shared/engine.ts`) because Node won't type-strip inside `node_modules`.
@@ -66,7 +66,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - [ ] Discuss: does the global streak also give a small XP bonus, or only scale the lootbox? (Currently lootbox only.)
 - [ ] Skills (K1–K6) are deferred ("Not now"). Q9 (link quests to topics) depends on them, so it is deferred too.
 - [ ] Maybes for later: mystery quests, weekday frequency (built into habits already), story arcs, 180-day journey / ascension map / final judgement, story/system log, dev testing panel.
-- [ ] Domain / subdomain on the Hetzner box.
+- [ ] Domain / subdomain on the Hetzner box (fallback: sslip.io; see phase 5).
 
 ## PWA feasibility notes
 - ✅ Web Push on Android (HTTPS + service worker + VAPID).
