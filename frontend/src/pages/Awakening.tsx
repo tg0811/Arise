@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera } from 'lucide-react';
 import { useAction } from '../lib/api';
@@ -11,6 +11,29 @@ type Step = 'detect' | 'name' | 'photo' | 'body' | 'covenant';
 const Line = ({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) => (
   <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.8 }} className={className}>{children}</motion.p>
 );
+
+/** Types text out character by character, like a System notification window. */
+function Typewriter({ text, delay = 0, className = '' }: { text: string; delay?: number; className?: string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let i = 0;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const start = setTimeout(() => {
+      timer = setInterval(() => {
+        i++;
+        setN(i);
+        if (i >= text.length) clearInterval(timer);
+      }, 45);
+    }, delay);
+    return () => { clearTimeout(start); clearInterval(timer); };
+  }, [text, delay]);
+  return (
+    <p className={className} aria-label={text}>
+      {text.slice(0, n)}
+      <span className={`ml-0.5 inline-block w-[0.5ch] ${n < text.length ? 'animate-pulse' : 'opacity-0'}`}>▌</span>
+    </p>
+  );
+}
 
 export function Awakening() {
   const [step, setStep] = useState<Step>('detect');
@@ -41,7 +64,7 @@ export function Awakening() {
           {step === 'detect' && (
             <button className="w-full" onClick={() => setStep('name')}>
               <Line className="label mb-6 !text-accent">[ System notification ]</Line>
-              <Line delay={0.6} className="font-display text-2xl font-bold leading-relaxed tracking-wider">THE SYSTEM HAS DETECTED A CANDIDATE.</Line>
+              <Typewriter text="THE SYSTEM HAS DETECTED A CANDIDATE." delay={600} className="font-display text-3xl font-bold leading-relaxed tracking-wider text-glow" />
               <Line delay={1.8} className="mt-6 text-ink2">You have acquired the qualifications to be a Player.</Line>
               <Line delay={3} className="mt-16 text-xs text-muted">Tap to continue</Line>
             </button>

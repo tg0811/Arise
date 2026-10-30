@@ -6,6 +6,7 @@ import { dirname, join, relative } from 'node:path';
 import { openDb } from './db.ts';
 import { createApp } from './app.ts';
 import { settle } from './game.ts';
+import { runReminders, webPushSender } from './reminders.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '../..');
@@ -24,12 +25,20 @@ if (existsSync(dist)) {
   app.get('*', (c) => (c.req.path.startsWith('/api/') ? c.json({ error: 'Not found' }, 404) : c.html(index)));
 }
 
-// Settle deadlines even when nobody has the app open (push reminders will rely on this).
-setInterval(() => {
+// Every minute: settle deadlines and send any due reminders, even when nobody has the app open.
+const sender = webPushSender(db);
+let ticking = false;
+setInterval(async () => {
+  if (ticking) return;
+  ticking = true;
   try {
-    settle({ db, at: new Date() });
+    const ctx = { db, at: new Date() };
+    settle(ctx);
+    await runReminders(ctx, sender);
   } catch (e) {
-    console.error('settle failed', e);
+    console.error('minute tick failed', e);
+  } finally {
+    ticking = false;
   }
 }, 60_000);
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Moon, Target, ChevronRight } from 'lucide-react';
+import { Plus, Moon, Target, ChevronRight, Timer } from 'lucide-react';
+import { FocusForm } from '../components/Focus';
 import { LootboxButton } from '../components/Lootbox';
 import { Countdown } from '../components/Countdown';
 import { DAY_CLEAR_RATIO } from '@shared';
@@ -13,6 +14,7 @@ type Editing = { kind: 'new' } | { kind: 'habit'; habit: Habit } | { kind: 'ques
 
 export function Today({ s }: { s: AppState }) {
   const [editing, setEditing] = useState<Editing>(null);
+  const [focusOpen, setFocusOpen] = useState(false);
   const todayHabits = s.habits.filter((h) => h.scheduledToday);
   const restHabits = s.habits.filter((h) => !h.scheduledToday);
   // Unresolved first, then done, then failed.
@@ -39,6 +41,17 @@ export function Today({ s }: { s: AppState }) {
           <span className="absolute top-0 h-2.5 w-0.5 bg-gold" style={{ left: `${DAY_CLEAR_RATIO * 100}%` }} title="Clear line" />
         </div>
       </Panel>
+
+      {!s.focus && (
+        <button onClick={() => setFocusOpen(true)} className="glass mt-3 flex w-full items-center gap-3 rounded-2xl p-3 text-left transition hover:border-accent">
+          <span className="rounded-xl bg-accent/15 p-2 text-accent"><Timer size={18} /></span>
+          <span className="flex-1">
+            <span className="block text-sm font-bold">Start a focus session</span>
+            <span className="block text-xs text-muted">Timed deep work: 1.5 XP per minute, bonus for finishing early</span>
+          </span>
+          <ChevronRight size={16} className="text-muted" />
+        </button>
+      )}
 
       {activeGoals.length > 0 && (
         <Link to="/goals" className="glass mt-3 block rounded-2xl p-3">
@@ -92,6 +105,10 @@ export function Today({ s }: { s: AppState }) {
         style={{ background: 'linear-gradient(135deg, var(--sl-accent), var(--sl-accent2))' }}>
         <Plus size={26} />
       </button>
+
+      <Sheet open={focusOpen} onClose={() => setFocusOpen(false)} title="Focus session">
+        {focusOpen && <FocusForm s={s} onDone={() => setFocusOpen(false)} />}
+      </Sheet>
 
       <Sheet open={editing !== null} onClose={() => setEditing(null)}
         title={editing?.kind === 'habit' ? 'Edit habit' : editing?.kind === 'quest' ? 'Edit quest' : 'New task'}>

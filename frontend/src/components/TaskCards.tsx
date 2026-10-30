@@ -6,6 +6,7 @@ import type { AppState, Habit, Quest } from '../lib/api';
 import { useAction } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
 import { CategoryIcon, useToast } from './ui';
+import { sfx } from '../lib/sound';
 import { Countdown } from './Countdown';
 
 function CategoryChip({ s, id }: { s: AppState; id: number | null }) {
@@ -34,7 +35,11 @@ function useTaskAction() {
   const toast = useToast();
   return (path: string, done?: string, tone: 'good' | 'bad' | 'info' = 'info', method = 'POST') =>
     action.mutate({ path, method }, {
-      onSuccess: () => done && toast(done, tone),
+      onSuccess: () => {
+        if (tone === 'good') sfx.complete();
+        if (tone === 'bad') sfx.fail();
+        if (done) toast(done, tone);
+      },
       onError: (e) => toast(e.message, 'bad'),
     });
 }

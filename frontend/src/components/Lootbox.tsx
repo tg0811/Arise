@@ -4,6 +4,7 @@ import { Gift, Lock, Coins, Gem, Sparkles, Package } from 'lucide-react';
 import { DAY_CLEAR_RATIO, lootStreakBonus } from '@shared';
 import { useAction, type AppState, type Loot } from '../lib/api';
 import { useToast } from './ui';
+import { sfx } from '../lib/sound';
 
 const LOOT_VIEW = {
   credits: { icon: Coins, color: 'text-gold', label: (l: Loot) => `${l.amount} Credits` },
@@ -22,7 +23,11 @@ export function LootboxButton({ s }: { s: AppState }) {
 
   const open = () =>
     action.mutate({ path: '/lootbox/open' }, {
-      onSuccess: (st) => st.loot && setReveal(st.loot),
+      onSuccess: (st) => {
+        if (!st.loot) return;
+        sfx.loot();
+        setReveal(st.loot);
+      },
       onError: (e) => toast(e.message, 'bad'),
     });
 

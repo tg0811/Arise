@@ -1,13 +1,17 @@
 import { openDb } from '../src/db.ts';
 import { createApp } from '../src/app.ts';
+import type { PushMessage, Sender } from '../src/reminders.ts';
 
 // Drives the real HTTP app against an in-memory DB with a controllable clock.
-export function harness(startIso = '2026-11-02T04:00:00Z', rolls: number[] = []) { // 09:30 IST, a Monday
+export function harness(startIso = '2026-11-02T04:00:00Z', rolls: number[] = [], gone = false) { // 09:30 IST, a Monday
   const db = openDb(':memory:');
   let now = new Date(startIso);
   // Lootbox rolls come from `rolls` (cycled) so tests can pin outcomes.
   let r = 0;
-  const app = createApp(db, () => now, rolls.length ? () => rolls[r++ % rolls.length] : undefined);
+  // Push messages are captured instead of sent.
+  const pushed: PushMessage[] = [];
+  const sender: Sender = async (_sub, m) => { pushed.push(m); return { gone }; };
+  const app = createApp(db, () => now, rolls.length ? () => rolls[r++ % rolls.length] : undefined, sender);
   let cookie = '';
   const call = async (method: string, path: string, body?: unknown) => {
     const res = await app.request(path, {
@@ -22,6 +26,10 @@ export function harness(startIso = '2026-11-02T04:00:00Z', rolls: number[] = [])
     return json;
   };
   return {
+    db,
+    sender,
+    pushed,
+    ctx: () => ({ db, at: now }),
     call,
     advance: (hours: number) => { now = new Date(now.getTime() + hours * 3600_000); },
     async boot() {

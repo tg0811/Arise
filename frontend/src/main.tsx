@@ -24,6 +24,7 @@ import { Goals } from './pages/Goals';
 import { Store } from './pages/Store';
 import { Archive } from './pages/Archive';
 import { TitleWatcher } from './components/TitleWatcher';
+import { AmbientParticles } from './components/fx';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: (n, err: any) => err?.status !== 401 && n < 2 } },
@@ -38,9 +39,10 @@ function Game() {
   useEffect(() => { if (s) applyTheme(s.progress.rank); }, [s?.progress.rank]);
   if (error) return <div className="p-8 text-center text-bad">{(error as Error).message}</div>;
   if (!s) return <Splash />;
-  if (!s.profile.onboarded) return <Awakening />;
+  if (!s.profile.onboarded) return <><AmbientParticles rank="E" /><Awakening /></>;
   return (
     <>
+      <AmbientParticles rank={s.progress.rank} />
       <LevelChange s={s} />
       <TitleWatcher s={s} />
       <Routes>

@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Camera, Plus, Pencil, LogOut, ScrollText, ChevronRight } from 'lucide-react';
+import { Camera, Plus, Pencil, LogOut, ScrollText, ChevronRight, Bell, BellRing, Volume2, VolumeX, Download, Upload, AlertTriangle } from 'lucide-react';
+import { disablePush, enablePush, pushStatus, type PushStatus } from '../lib/push';
+import { setSoundEnabled, sfx, soundEnabled } from '../lib/sound';
 import { api, useAction, type AppState, type Category } from '../lib/api';
 import { Avatar, resizeImage } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
@@ -80,6 +82,9 @@ export function Settings({ s }: { s: AppState }) {
         ))}
       </Panel>
 
+      <Notifications s={s} />
+      <DataSection />
+
       <SectionTitle>Session</SectionTitle>
       <Button variant="ghost" onClick={logout}><LogOut size={15} /> Log out</Button>
 
@@ -132,3 +137,174 @@ function CategoryForm({ cat, onDone }: { cat: Category | null; onDone: () => voi
     </div>
   );
 }
+
+// ---------------------------------------------------------------- notifications & sound
+
+const STATUS_TEXT: Record<PushStatus, string> = {
+  on: 'On for this device',
+  off: 'Off on this device',
+  blocked: 'Blocked in browser settings: allow notifications for this site, then try again',
+  insecure: 'Needs HTTPS. Works once the app is deployed (or on localhost)',
+  unsupported: 'This browser does not support push notifications',
+};
+
+function Notifications({ s }: { s: AppState }) {
+  const qc = useQueryClient();
+  const action = useAction();
+  const toast = useToast();
+  const [status, setStatus] = useState<PushStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sound, setSound] = useState(soundEnabled());
+  const r = s.reminders;
+  useEffect(() => { void pushStatus().then(setStatus); }, []);
+
+  const toggle = async () => {
+    setBusy(true);
+    try {
+      const next = status === 'on' ? await disablePush() : await enablePush();
+      qc.setQueryData(['state'], next);
+      setStatus(await pushStatus());
+      toast(status === 'on' ? 'Notifications off for this device' : 'Notifications on', 'good');
+    } catch (e) {
+      toast((e as Error).message, 'bad');
+      setStatus(await pushStatus());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = (patch: Partial<typeof r>) => {
+    const { devices: _devices, ...prefs } = { ...r, ...patch };
+    action.mutate({ method: 'PUT', path: '/reminders', body: prefs }, { onError: (e) => toast(e.message, 'bad') });
+  };
+
+  // TEMPORARY (owner request 2026-10-31): manual test button while notifications are being tried out.
+  const test = async () => {
+    try {
+      await api('POST', '/push/test');
+      toast('Test sent. Check your notifications.', 'good');
+    } catch (e) {
+      toast((e as Error).message, 'bad');
+    }
+  };
+
+  return (
+    <>
+      <SectionTitle>Notifications</SectionTitle>
+      <Panel className="space-y-4 p-5">
+        <div className="flex items-center gap-3">
+          <Bell size={18} className={status === 'on' ? 'text-accent' : 'text-muted'} />
+          <div className="flex-1">
+            <p className="font-semibold">Push reminders</p>
+            <p className="text-xs text-muted">{status ? STATUS_TEXT[status] : 'Checking…'}{r.devices > 0 && ` · ${r.devices} device${r.devices > 1 ? 's' : ''} subscribed`}</p>
+          </div>
+          {(status === 'on' || status === 'off') && (
+            <Button variant={status === 'on' ? 'ghost' : 'primary'} onClick={toggle} disabled={busy}>{status === 'on' ? 'Turn off' : 'Turn on'}</Button>
+          )}
+        </div>
+
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>Send reminders<span className="block text-xs text-muted">Applies to every subscribed device</span></span>
+          <input type="checkbox" checked={r.enabled} onChange={(e) => save({ enabled: e.target.checked })} className="h-4 w-4 accent-[var(--sl-accent)]" />
+        </label>
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>Remind me every<span className="block text-xs text-muted">"N tasks still undone": only today's scheduled tasks, never when all are done</span></span>
+          <select className="field w-24" value={r.intervalHours} onChange={(e) => save({ intervalHours: Number(e.target.value) })}>
+            {[1, 2, 3, 4, 6, 8].map((h) => <option key={h} value={h}>{h} h</option>)}
+          </select>
+        </label>
+        <div className="text-sm">
+          <span>Quiet hours<span className="block text-xs text-muted">No interval reminders in this window</span></span>
+          <span className="mt-2 flex items-center gap-2">
+            <input type="time" className="field flex-1 py-1.5" aria-label="Quiet hours start" value={r.quietStart} onChange={(e) => e.target.value && save({ quietStart: e.target.value })} />
+            <span className="text-muted">to</span>
+            <input type="time" className="field flex-1 py-1.5" aria-label="Quiet hours end" value={r.quietEnd} onChange={(e) => e.target.value && save({ quietEnd: e.target.value })} />
+          </span>
+        </div>
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>Deadline nudge<span className="block text-xs text-muted">Before a habit's "by" time or a quest's deadline (ignores quiet hours)</span></span>
+          <select className="field w-28" value={r.nudgeMinutes} onChange={(e) => save({ nudgeMinutes: Number(e.target.value) })}>
+            {[0, 15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m === 0 ? 'Off' : `${m} min`}</option>)}
+          </select>
+        </label>
+
+        <Button variant="ghost" className="w-full" onClick={test} disabled={r.devices === 0}>
+          <BellRing size={15} /> Send test notification
+        </Button>
+
+        <label className="flex items-center justify-between gap-3 border-t border-line pt-4 text-sm">
+          <span className="flex items-center gap-2">{sound ? <Volume2 size={16} /> : <VolumeX size={16} />} Sound effects<span className="text-xs text-muted">(this device)</span></span>
+          <input type="checkbox" checked={sound} onChange={(e) => { setSoundEnabled(e.target.checked); setSound(e.target.checked); if (e.target.checked) sfx.complete(); }} className="h-4 w-4 accent-[var(--sl-accent)]" />
+        </label>
+      </Panel>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- backup, restore, reset
+
+function DataSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [phrase, setPhrase] = useState('');
+
+  const restore = async (file: File) => {
+    let data: unknown;
+    try {
+      data = JSON.parse(await file.text());
+    } catch {
+      return toast('That file is not valid JSON', 'bad');
+    }
+    if (!confirm('Overwrite ALL current data with this backup? This cannot be undone.')) return;
+    try {
+      qc.setQueryData(['state'], await api('POST', '/restore', data));
+      await qc.invalidateQueries({ queryKey: ['archive'] });
+      toast('Progress restored from backup', 'good');
+    } catch (e) {
+      toast((e as Error).message, 'bad');
+    }
+  };
+
+  const reset = async () => {
+    try {
+      qc.setQueryData(['state'], await api('POST', '/reset', { phrase }));
+      await qc.invalidateQueries({ queryKey: ['archive'] });
+      setResetOpen(false);
+    } catch (e) {
+      toast((e as Error).message, 'bad');
+    }
+  };
+
+  return (
+    <>
+      <SectionTitle>Data</SectionTitle>
+      <Panel brackets={false} className="divide-y divide-line">
+        <a href="/api/backup" download className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
+          <Download size={16} className="text-accent" />
+          <span className="flex-1 text-sm font-semibold">Download backup<span className="block text-xs font-normal text-muted">Everything as one JSON file (no password inside)</span></span>
+        </a>
+        <button onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/5">
+          <Upload size={16} className="text-accent" />
+          <span className="flex-1 text-sm font-semibold">Restore from backup<span className="block text-xs font-normal text-muted">Replaces all current data</span></span>
+        </button>
+        <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void restore(f); }} />
+        <button onClick={() => { setPhrase(''); setResetOpen(true); }} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/5">
+          <AlertTriangle size={16} className="text-bad" />
+          <span className="flex-1 text-sm font-semibold text-bad">Reset everything<span className="block text-xs font-normal text-muted">Wipe all progress and start over from the Awakening</span></span>
+        </button>
+      </Panel>
+
+      <Sheet open={resetOpen} onClose={() => setResetOpen(false)} title="Reset everything">
+        <p className="text-sm text-ink2">This wipes <b className="text-bad">all</b> progress: XP, levels, habits, quests, goals, journal, store and history. Your login and notification devices stay. There is no undo. Download a backup first if you might want it back.</p>
+        <p className="mt-4 text-sm">Type <b className="font-mono text-bad">{RESET_PHRASE}</b> to confirm:</p>
+        <input className="field mt-2 font-mono" value={phrase} onChange={(e) => setPhrase(e.target.value)} placeholder="Type here…" autoCapitalize="characters" />
+        <Button variant="bad" className="mt-4 w-full" disabled={phrase !== RESET_PHRASE} onClick={reset}>I accept the reset</Button>
+      </Sheet>
+    </>
+  );
+}
+
+const RESET_PHRASE = 'I ACCEPT THE RESET';

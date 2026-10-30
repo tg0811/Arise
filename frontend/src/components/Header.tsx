@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Flame, Coins, Gem, Settings } from 'lucide-react';
+import { useIsMutating } from '@tanstack/react-query';
+import { Flame, Coins, Gem, Settings, Loader2 } from 'lucide-react';
 import type { AppState } from '../lib/api';
 import { Avatar } from './Avatar';
 import { BodyStats } from './BodyStats';
@@ -7,6 +8,7 @@ import { CategoryIcon, ProgressBar } from './ui';
 
 export function Header({ s }: { s: AppState }) {
   const p = s.progress;
+  const saving = useIsMutating() > 0;
   return (
     <header className="glass-solid sticky top-0 z-40 -mx-4 mb-2 rounded-b-3xl border-t-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:mx-0 sm:mt-3 sm:rounded-3xl sm:border-t">
       <div className="flex items-center gap-3">
@@ -29,6 +31,10 @@ export function Header({ s }: { s: AppState }) {
         <div className="flex flex-col items-end gap-1 text-xs font-bold">
           <span className="flex items-center gap-1 text-gold"><Coins size={13} /> {s.wallet.credits}</span>
           <span className="flex items-center gap-1 text-accent2"><Gem size={13} /> {s.wallet.gems}</span>
+          {/* Save indicator: every action is saved on the server; this shows it's in flight. */}
+          <span className={`flex items-center gap-1 text-[10px] font-semibold text-muted transition-opacity ${saving ? 'opacity-100' : 'opacity-0'}`} aria-live="polite">
+            <Loader2 size={10} className="animate-spin" /> Saving
+          </span>
         </div>
         <Link to="/settings" aria-label="Settings" className="-mr-1 self-start rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-ink md:hidden">
           <Settings size={18} />

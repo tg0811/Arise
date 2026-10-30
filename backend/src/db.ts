@@ -178,14 +178,7 @@ const MIGRATIONS: string[] = [
     updated_at TEXT NOT NULL
   );
 
-  -- Starter rewards; edit or delete freely.
-  INSERT INTO store_items (name, description, icon, cost, currency, sort, created_at) VALUES
-    ('Fancy coffee', 'One coffee from your favourite café.', 'coffee', 100, 'credits', 0, datetime('now')),
-    ('One episode', 'One episode of a series, guilt-free.', 'tv', 150, 'credits', 1, datetime('now')),
-    ('Gaming hour', 'One hour of games, no guilt.', 'gamepad', 200, 'credits', 2, datetime('now')),
-    ('Movie night', 'A full movie, snacks included.', 'film', 300, 'credits', 3, datetime('now')),
-    ('Cheat meal', 'One meal off the plan.', 'pizza', 400, 'credits', 4, datetime('now')),
-    ('Something you wanted', 'Buy that thing you have been eyeing.', 'gift', 10, 'gems', 5, datetime('now'));
+  -- Starter rewards are inserted by seedRewards() right after this step.
   `,
   `
   -- Phase 3: earned titles. Once unlocked, a title is kept forever (even if the streak behind it breaks).
@@ -194,6 +187,31 @@ const MIGRATIONS: string[] = [
     unlocked_at TEXT NOT NULL
   );
   ALTER TABLE profile ADD COLUMN equipped_title TEXT;
+  `,
+  `
+  -- Phase 4: push reminders and focus sessions
+  CREATE TABLE push_subscriptions (
+    endpoint TEXT PRIMARY KEY,
+    json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  -- One row per reminder already sent (e.g. 'habit:12:2026-10-31'), so each nudge fires once.
+  CREATE TABLE reminders_sent (
+    key TEXT PRIMARY KEY,
+    at TEXT NOT NULL
+  );
+
+  CREATE TABLE focus_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    category_id INTEGER REFERENCES categories(id),
+    planned_min INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'done', 'abandoned')),
+    xp INTEGER NOT NULL DEFAULT 0
+  );
   `,
 ];
 
@@ -220,6 +238,7 @@ function migrate(db: DB) {
       db.exec(MIGRATIONS[v]);
       if (v === 0) seed(db);
       if (v === 1) db.prepare('UPDATE profile SET height_cm = 167 WHERE id = 1').run();
+      if (v === 3) seedRewards(db);
       db.exec(`PRAGMA user_version = ${v + 1}`);
       db.exec('COMMIT');
     } catch (e) {
@@ -229,10 +248,26 @@ function migrate(db: DB) {
   }
 }
 
-function seed(db: DB) {
+/** Fresh profile row + default categories (first run, and after a reset). */
+export function seed(db: DB) {
   db.prepare('INSERT INTO profile (id, created_at) VALUES (1, ?)').run(new Date().toISOString());
   const ins = db.prepare('INSERT INTO categories (name, color, icon, sort) VALUES (?, ?, ?, ?)');
   DEFAULT_CATEGORIES.forEach(([name, color, icon], i) => ins.run(name, color, icon, i));
+}
+
+const STARTER_REWARDS: [string, string, string, number, 'credits' | 'gems'][] = [
+  ['Fancy coffee', 'One coffee from your favourite café.', 'coffee', 100, 'credits'],
+  ['One episode', 'One episode of a series, guilt-free.', 'tv', 150, 'credits'],
+  ['Gaming hour', 'One hour of games, no guilt.', 'gamepad', 200, 'credits'],
+  ['Movie night', 'A full movie, snacks included.', 'film', 300, 'credits'],
+  ['Cheat meal', 'One meal off the plan.', 'pizza', 400, 'credits'],
+  ['Something you wanted', 'Buy that thing you have been eyeing.', 'gift', 10, 'gems'],
+];
+
+/** Starter store rewards; the owner edits or deletes them freely. */
+export function seedRewards(db: DB) {
+  const ins = db.prepare('INSERT INTO store_items (name, description, icon, cost, currency, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  STARTER_REWARDS.forEach(([name, desc, icon, cost, currency], i) => ins.run(name, desc, icon, cost, currency, i, new Date().toISOString()));
 }
 
 export function getSetting(db: DB, key: string): string | null {

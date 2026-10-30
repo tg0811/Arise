@@ -8,13 +8,16 @@ import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
   getProfile, getTask, logWeight, settle, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, GOAL_TYPES, localDate } from '../../shared/engine.ts';
+import { DIFFICULTIES, FOCUS_MAX_MIN, GOAL_TYPES, localDate } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
 import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
 import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
 import { createEntry, deleteEntry, updateEntry } from './journal.ts';
 import { equipTitle } from './titles.ts';
 import { archiveState } from './archive.ts';
+import { abandonFocus, completeFocus, startFocus } from './focus.ts';
+import { sendTest, setPrefs, subscribe, unsubscribe, vapidKeys, webPushSender, type Sender } from './reminders.ts';
+import { exportData, resetData, restoreData } from './backup.ts';
 
 const difficulty = z.enum(DIFFICULTIES as [string, ...string[]]);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -100,7 +103,22 @@ const JournalText = {
 const JournalBody = z.object({ kind: z.enum(['note', 'aar']), goalId: z.number().int().nullable().default(null), ...JournalText });
 const JournalEditBody = z.object(JournalText);
 
-export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: () => number) {
+const ReminderBody = z.object({
+  enabled: z.boolean(),
+  intervalHours: z.number().int().min(1).max(12),
+  quietStart: hhmm,
+  quietEnd: hhmm,
+  nudgeMinutes: z.number().int().min(0).max(180),
+});
+
+const PushSubBody = z.object({
+  endpoint: z.string().url(),
+  expirationTime: z.number().nullable().optional(),
+  keys: z.object({ p256dh: z.string(), auth: z.string() }),
+});
+
+export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: () => number, sender?: Sender) {
+  const send = () => sender ?? webPushSender(db);
   const app = new Hono();
   const secure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : process.env.NODE_ENV === 'production';
   const ctx = (): Ctx => ({ db, at: clock(), rng });
@@ -327,6 +345,50 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     return c.json(mutate((cx) => updateEntry(cx, id(c.req.param('id')), b)));
   });
   app.delete('/api/journal/:id', (c) => c.json(mutate((cx) => deleteEntry(cx, id(c.req.param('id'))))));
+
+  // ------------------------------------------------------------ phase 4: focus
+  app.post('/api/focus/start', async (c) => {
+    const b = z.object({ title: z.string().trim().min(1).max(80), categoryId: z.number().int().nullable(), minutes: z.number().int().min(5).max(FOCUS_MAX_MIN) })
+      .parse(await c.req.json());
+    return c.json(mutate((cx) => startFocus(cx, b)));
+  });
+  app.post('/api/focus/complete', (c) => c.json(mutate((cx) => completeFocus(cx))));
+  app.post('/api/focus/abandon', (c) => c.json(mutate((cx) => abandonFocus(cx))));
+
+  // ------------------------------------------------------------ phase 4: push reminders
+  app.get('/api/push/key', (c) => c.json({ publicKey: vapidKeys(db).publicKey }));
+  app.post('/api/push/subscribe', async (c) => {
+    const sub = PushSubBody.parse(await c.req.json());
+    return c.json(mutate((cx) => subscribe(cx, sub as any)));
+  });
+  app.post('/api/push/unsubscribe', async (c) => {
+    const { endpoint } = z.object({ endpoint: z.string() }).parse(await c.req.json());
+    return c.json(mutate((cx) => unsubscribe(cx, endpoint)));
+  });
+  app.post('/api/push/test', async (c) => {
+    await sendTest(ctx(), send());
+    return c.json({ ok: true });
+  });
+  app.put('/api/reminders', async (c) => {
+    const b = ReminderBody.parse(await c.req.json());
+    return c.json(mutate(() => setPrefs(db, b)));
+  });
+
+  // ------------------------------------------------------------ phase 4: data
+  app.get('/api/backup', (c) => {
+    const date = localDate(getProfile(db).timezone, clock());
+    c.header('Content-Disposition', `attachment; filename="arise-backup-${date}.json"`);
+    return c.json(exportData(db));
+  });
+  app.post('/api/restore', async (c) => {
+    restoreData(db, await c.req.json());
+    return c.json(state());
+  });
+  app.post('/api/reset', async (c) => {
+    const { phrase } = z.object({ phrase: z.string() }).parse(await c.req.json());
+    resetData(db, phrase);
+    return c.json(state());
+  });
 
   // ------------------------------------------------------------ phase 3
   app.get('/api/archive', (c) => {

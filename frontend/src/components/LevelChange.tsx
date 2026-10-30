@@ -3,16 +3,23 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { RANKS, type Rank } from '@shared';
 import type { AppState } from '../lib/api';
 import { RANK_COLORS, rankColor } from '../lib/theme';
+import { sfx } from '../lib/sound';
+import { GenerativeArt } from './fx';
+import { SRankCutscene } from './SRankCutscene';
+
+const SRANK_SEEN = 'sl-srank-seen';
+const seenSRank = () => { try { return localStorage.getItem(SRANK_SEEN) === '1'; } catch { return false; } };
 
 type Change = { kind: 'up' | 'down'; level: number; rank: Rank; title: string; rankChanged: boolean };
 
 /**
- * Watches level/rank between state updates and plays a full-screen splash.
- * Phase 4 will swap the backdrop for LevelUp's generative art + sound.
+ * Watches level/rank between state updates and plays a full-screen splash over LevelUp-style
+ * generative art, with sound. Reaching S-rank for the first time plays the cutscene instead.
  */
 export function LevelChange({ s }: { s: AppState | undefined }) {
   const prev = useRef<{ level: number; rank: Rank } | null>(null);
   const [change, setChange] = useState<Change | null>(null);
+  const [cutscene, setCutscene] = useState(false);
 
   useEffect(() => {
     if (!s) return;
@@ -20,21 +27,42 @@ export function LevelChange({ s }: { s: AppState | undefined }) {
     const p = prev.current;
     prev.current = cur;
     if (!p || p.level === cur.level) return;
-    setChange({ kind: cur.level > p.level ? 'up' : 'down', level: cur.level, rank: cur.rank, title: s.progress.title, rankChanged: p.rank !== cur.rank });
+    const kind = cur.level > p.level ? 'up' : 'down';
+    const rankChanged = p.rank !== cur.rank;
+    if (kind === 'up' && rankChanged && cur.rank === 'S' && !seenSRank()) {
+      sfx.rankUp();
+      setCutscene(true);
+      return;
+    }
+    if (kind === 'down') sfx.fall();
+    else if (rankChanged) sfx.rankUp();
+    else sfx.levelUp();
+    setChange({ kind, level: cur.level, rank: cur.rank, title: s.progress.title, rankChanged });
   }, [s]);
 
   useEffect(() => {
     if (!change) return;
-    const t = setTimeout(() => setChange(null), change.rankChanged ? 5500 : 3500);
+    const t = setTimeout(() => setChange(null), change.rankChanged ? 6500 : 4500);
     return () => clearTimeout(t);
   }, [change]);
 
   const up = change?.kind === 'up';
+  if (cutscene && s) {
+    return <SRankCutscene name={s.profile.name} level={s.progress.level} onDone={() => {
+      try { localStorage.setItem(SRANK_SEEN, '1'); } catch { /* replays next time: fine */ }
+      setCutscene(false);
+    }} />;
+  }
   return (
     <AnimatePresence>
       {change && (
         <motion.div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/85 px-6 text-center backdrop-blur-md"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setChange(null)}>
+          {up && (
+            <GenerativeArt
+              color={change.rankChanged ? rankColor(change.rank) : '#3b82f6'}
+              color2={change.rankChanged ? RANK_COLORS[change.rank].glow : '#22d3ee'} />
+          )}
           <motion.div className="absolute h-72 w-72 rounded-full"
             style={{ background: `radial-gradient(circle, ${!up ? 'rgba(248,113,113,.35)' : change.rankChanged ? `color-mix(in srgb, ${rankColor(change.rank)} 55%, transparent)` : 'color-mix(in srgb, var(--sl-accent) 55%, transparent)'}, transparent 70%)` }}
             initial={{ scale: 0.2 }} animate={{ scale: [0.2, 1.4, 1.1] }} transition={{ duration: 1.4 }} />

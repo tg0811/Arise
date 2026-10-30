@@ -13,7 +13,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png', 'icons/*.svg'],
+      includeAssets: ['icons/*.png', 'icons/*.svg', 'push-sw.js'],
+      // Service worker also in dev, so notifications can be tried on localhost.
+      devOptions: { enabled: true },
       manifest: {
         name: 'Arise — Solo Leveling',
         short_name: 'Arise',
@@ -30,6 +32,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        importScripts: ['push-sw.js'],
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
       },

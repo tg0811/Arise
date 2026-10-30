@@ -7,6 +7,7 @@ import { formatDate, toLocalInput } from '../lib/time';
 import { Countdown } from '../components/Countdown';
 import { CategoryPicker, Field } from '../components/TaskForm';
 import { Button, CategoryIcon, Panel, SectionTitle, Sheet, Tabs, useToast } from '../components/ui';
+import { sfx } from '../lib/sound';
 
 export const GOAL_TYPE_VIEW: Record<GoalType, { label: string; hint: string; icon: typeof Castle }> = {
   siege: { label: 'Siege', hint: 'Exam or test', icon: Castle },
@@ -83,7 +84,7 @@ function GoalCard({ s, g, onEdit, onReview }: { s: AppState; g: Goal; onEdit: ()
   const view = GOAL_TYPE_VIEW[g.type];
   const cat = s.categories.find((c) => c.id === g.categoryId);
   const run = (method: string, path: string, msg: string, tone: 'good' | 'info' = 'info') =>
-    action.mutate({ method, path }, { onSuccess: () => toast(msg, tone), onError: (e) => toast(e.message, 'bad') });
+    action.mutate({ method, path }, { onSuccess: () => { if (tone === 'good') sfx.complete(); toast(msg, tone); }, onError: (e) => toast(e.message, 'bad') });
 
   return (
     <motion.div layout className={`glass relative overflow-hidden rounded-2xl p-4 ${g.pastDue && g.status === 'active' ? 'border-bad/50' : ''} ${g.status === 'done' ? 'opacity-75' : ''}`}>

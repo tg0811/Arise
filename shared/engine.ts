@@ -198,11 +198,70 @@ export function rollLoot(rng: () => number, streak: number): { type: LootType; a
   return { type: 'item', amount: 1 };
 }
 
+// ---------------------------------------------------------------- focus timer
+
+export const FOCUS_XP_PER_MIN = 1.5;
+export const FOCUS_CREDITS_PER_MIN = 0.5;
+/** You can only claim a session after this share of the planned time… */
+export const FOCUS_MIN_SHARE = 0.5;
+/** …which also caps the early-finish bonus (finishing at exactly half time = +50%). */
+export const FOCUS_EARLY_BONUS_CAP = 0.5;
+export const FOCUS_MAX_MIN = 240;
+export const FOCUS_PRESETS = [15, 25, 45, 60, 90];
+
+/** Reward for a focus session, or null if it's too early to claim. Overtime earns the base. */
+export function focusReward(plannedMin: number, elapsedMin: number): { xp: number; credits: number; bonus: number } | null {
+  if (elapsedMin < plannedMin * FOCUS_MIN_SHARE) return null;
+  const bonus = elapsedMin < plannedMin ? Math.min((plannedMin - elapsedMin) / plannedMin, FOCUS_EARLY_BONUS_CAP) : 0;
+  return {
+    xp: Math.round(plannedMin * FOCUS_XP_PER_MIN * (1 + bonus)),
+    credits: Math.round(plannedMin * FOCUS_CREDITS_PER_MIN * (1 + bonus)),
+    bonus,
+  };
+}
+
+// ---------------------------------------------------------------- reminders
+
+export interface ReminderPrefs {
+  enabled: boolean;
+  /** Hours between "N tasks still undone" reminders. */
+  intervalHours: number;
+  /** No interval reminders between these local times (HH:MM). Deadline nudges still fire. */
+  quietStart: string;
+  quietEnd: string;
+  /** Nudge this many minutes before a habit/quest deadline (0 = off). */
+  nudgeMinutes: number;
+}
+
+export const DEFAULT_REMINDERS: ReminderPrefs = { enabled: true, intervalHours: 3, quietStart: '23:00', quietEnd: '07:00', nudgeMinutes: 30 };
+
+const toMin = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+
+/** Is local minute-of-day `min` inside the quiet window (which may wrap past midnight)? */
+export function inQuietHours(min: number, quietStart: string, quietEnd: string): boolean {
+  const qs = toMin(quietStart);
+  const qe = toMin(quietEnd);
+  if (qs === qe) return false;
+  return qs < qe ? min >= qs && min < qe : min >= qs || min < qe;
+}
+
+export const minuteOfDay = toMin;
+
 // ---------------------------------------------------------------- dates
 // Calendar dates are plain 'YYYY-MM-DD' strings in the player's timezone.
 
 export function localDate(tz: string, at: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+}
+
+/** Minutes since local midnight in `tz`. */
+export function localMinute(tz: string, at: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(at);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  return get('hour') * 60 + get('minute');
 }
 
 export function addDays(date: string, n: number): string {

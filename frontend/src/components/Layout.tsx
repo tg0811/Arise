@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Swords, Target, ShoppingBag, ScrollText, User, Settings, type LucideIcon } from 'lucide-react';
 import type { AppState } from '../lib/api';
 import { Header } from './Header';
+import { FocusBar } from './Focus';
 
 export const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Today', icon: Swords },
@@ -39,6 +40,7 @@ export function Layout({ s }: { s: AppState }) {
 
       <main className="min-w-0 flex-1 px-4 pb-28 md:pb-10">
         <Header s={s} />
+        <FocusBar s={s} />
         <Outlet />
       </main>
 

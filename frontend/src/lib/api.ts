@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Difficulty, GoalType, LootType, Mood, Rank } from '@shared';
+import type { Difficulty, GoalType, LootType, Mood, Rank, ReminderPrefs } from '@shared';
 
 // Mirrors backend buildState(). Every mutation returns the full fresh state.
 export interface Category { id: number; name: string; color: string; icon: string; sort: number; xp: number; level: number; into: number; need: number; pct: number }
@@ -42,6 +42,8 @@ export interface AppState {
   loot?: Loot;
   titles: Title[];
   equippedTitle: { key: string; name: string } | null;
+  focus: { id: number; title: string; categoryId: number | null; plannedMin: number; startedAt: string } | null;
+  reminders: ReminderPrefs & { devices: number };
 }
 
 export interface Title { key: string; name: string; hint: string; cur: number; target: number; unlocked: boolean; unlockedAt: string | null }
