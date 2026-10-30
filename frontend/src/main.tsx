@@ -12,6 +12,7 @@ import './index.css';
 import { api, useAppState } from './lib/api';
 import { applyTheme } from './lib/theme';
 import { ToastProvider } from './components/ui';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { LevelChange } from './components/LevelChange';
 import { Auth } from './pages/Auth';
@@ -65,7 +66,11 @@ function App() {
   const auth = useQuery({ queryKey: ['auth'], queryFn: () => api<{ configured: boolean; authed: boolean }>('GET', '/auth/status') });
   if (!auth.data) return <Splash />;
   if (!auth.data.authed) return <Auth configured={auth.data.configured} />;
-  return <Game />;
+  return (
+    <ErrorBoundary>
+      <Game />
+    </ErrorBoundary>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(
