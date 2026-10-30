@@ -14,8 +14,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'icons/*.svg', 'push-sw.js'],
-      // Service worker also in dev, so notifications can be tried on localhost.
-      devOptions: { enabled: true },
+      // No service worker in dev: its cached index.html goes stale across Vite restarts and
+      // blanks the page. Try push with the production build (npm run build && npm start).
       manifest: {
         name: 'Arise — Solo Leveling',
         short_name: 'Arise',
@@ -35,6 +35,7 @@ export default defineConfig({
         importScripts: ['push-sw.js'],
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
+        globIgnores: ['dev-sw.js'],
       },
     }),
   ],

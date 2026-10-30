@@ -67,6 +67,8 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - Habit deadline time is display-only ("late" after it). Honest self-report until midnight, then auto-fail.
 - Removing a pending quest is penalty-free (escape hatch). Abandoning costs its XP.
 
+- **No service worker in dev** (incident 2026-10-31): phase 4 enabled vite-plugin-pwa `devOptions`. Its dev SW answered every navigation with a precached `index.html`, which went stale across Vite restarts and blanked the owner's page (dark-blue background only). Fixed by removing `devOptions`; `frontend/public/dev-sw.js` is a self-destroying worker that cleans up browsers that registered the old one (delete it after 2026-12). Test push with the production build (`npm run build && npm start`) or on the deployed HTTPS site.
+
 ## Open questions
 - [ ] Weight trend chart and BMI on Character? (Data is already logged daily.)
 - [ ] Discuss: does the global streak also give a small XP bonus, or only scale the lootbox? (Currently lootbox only.)
@@ -81,6 +83,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - ❌ Reading other apps' screen time. The Veil is manual instead (decided).
 
 ## Progress
+- **2026-10-31**: Blank-page bug after phase 4 → the dev-mode service worker (see Implementation notes). Fixed and verified: the old SW unregisters itself and the page renders.
 - **2026-10-31**: **Phase 4 built and verified.** 27/27 backend tests (7 new: focus rules, reminder timing/quiet hours/nudges/dedup/dead subs, backup→reset→restore). Real web-push send verified against a local HTTPS fake push service: aes128gcm payload decrypts intact, VAPID header present. The SW push handler was verified by injecting a push via Chrome DevTools Protocol. Headless Chromium can't subscribe to a real push service (known limitation), so **phone push needs the HTTPS deploy to test**. Migration 6 applies to the real DB. Starter rewards are now seeded by `seedRewards()` (same result).
 - **2026-10-31**: **Phase 3 built and verified.** Archive (Overview: KPI tiles + 28-day heatmap + weekly XP gained/lost chart + record; History: ledger by day with paging; Streaks: per-habit current/best/success + 28-day strip). Titles + equip + unlock toasts. Chart colours validated (gain `#3b82f6` / loss `#ef4444` on navy; heatmap is a monotonic blue ramp). Pages now scroll to top on navigation. 20/20 backend tests. Browser run on 20 seeded days had no errors. Migration 5 applies to the real DB.
 - **2026-10-31**: Re-themed to System blue. Rank colour only on rank elements; Rajdhani headings. Verified at E/C/S in the browser, including a live rank-up into S.
