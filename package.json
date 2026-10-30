@@ -1,0 +1,12 @@
+{
+  "name": "sololeveling",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shared", "backend", "frontend"],
+  "scripts": {
+    "dev": "npm run dev -w backend & npm run dev -w frontend",
+    "build": "npm run build -w frontend",
+    "start": "npm start -w backend",
+    "typecheck": "tsc -p backend --noEmit && tsc -p frontend --noEmit"
+  }
+}

@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature Shortlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Lora:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020617;
+    --panel: #0f172a;
+    --panel-2: #111c33;
+    --border: #1e293b;
+    --text: #f8fafc;
+    --text-2: #94a3b8;
+    --muted: #64748b;
+    --blue: #3b82f6;
+    --gold: #eab308;
+    --purple: #a855f7;
+    --red: #ef4444;
+    --green: #22c55e;
+    --lu: #3b82f6;      /* LevelUp tag */
+    --ts: #d97757;      /* THE-SYSTEM tag (its coral accent) */
+    --both: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', system-ui, sans-serif;
+    line-height: 1.5;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 15% 0%, rgba(59,130,246,.10), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 90% 10%, rgba(168,85,247,.08), transparent 70%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 16px 120px; }
+  header.hero { margin-bottom: 28px; }
+  .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; color: var(--blue); }
+  h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 900; letter-spacing: -.02em; margin: 6px 0 10px; }
+  h1 span { background: linear-gradient(90deg, var(--blue), var(--purple)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { color: var(--text-2); max-width: 760px; margin: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; font-size: 13px; color: var(--text-2); }
+  .legend > div { display: flex; align-items: center; gap: 6px; }
+
+  .tag { display: inline-flex; align-items: center; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+         padding: 2px 7px; border-radius: 5px; border: 1px solid; white-space: nowrap; }
+  .tag.LU { color: var(--lu); border-color: rgba(59,130,246,.35); background: rgba(59,130,246,.08); }
+  .tag.TS { color: var(--ts); border-color: rgba(217,119,87,.35); background: rgba(217,119,87,.08); }
+  .tag.BOTH { color: var(--both); border-color: rgba(168,85,247,.35); background: rgba(168,85,247,.08); }
+  .tag.pwa-partial { color: var(--gold); border-color: rgba(234,179,8,.35); background: rgba(234,179,8,.08); }
+  .tag.pwa-no { color: var(--red); border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
+
+  /* sticky toolbar */
+  .toolbar { position: sticky; top: 0; z-index: 10; margin: 0 -16px 24px; padding: 12px 16px;
+             background: rgba(2,6,23,.85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+             border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .seg button { background: transparent; color: var(--text-2); border: 0; padding: 7px 11px; font: 600 12px 'Outfit'; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: rgba(59,130,246,.15); color: var(--text); }
+  .counts { font-size: 12px; color: var(--text-2); display: flex; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+  .counts b { color: var(--text); }
+  .btn { background: linear-gradient(90deg, var(--blue), var(--purple)); color: white; border: 0; border-radius: 10px;
+         padding: 8px 14px; font: 700 12px 'Outfit'; letter-spacing: .04em; cursor: pointer; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text-2); }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+  nav.toc a { font-size: 12px; font-weight: 600; color: var(--text-2); text-decoration: none; padding: 5px 10px;
+              border: 1px solid var(--border); border-radius: 999px; background: rgba(15,23,42,.5); }
+  nav.toc a:hover { color: var(--text); border-color: var(--blue); }
+
+  section.cat { margin-bottom: 40px; }
+  section.cat > h2 { font-size: 22px; font-weight: 800; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  section.cat > h2 .n { font-size: 12px; color: var(--muted); font-weight: 600; }
+  section.cat > p.sub { color: var(--text-2); margin: 0 0 14px; font-size: 14px; }
+
+  .feat { background: rgba(15,23,42,.6); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+          display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; transition: border-color .2s, opacity .2s; }
+  .feat[data-pick="must"] { border-color: rgba(34,197,94,.55); box-shadow: inset 3px 0 0 var(--green); }
+  .feat[data-pick="maybe"] { border-color: rgba(234,179,8,.45); box-shadow: inset 3px 0 0 var(--gold); }
+  .feat[data-pick="skip"] { opacity: .45; }
+  .feat .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .feat .name { font-weight: 700; font-size: 16px; }
+  .feat .id { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .feat .desc { grid-column: 1 / 2; color: var(--text-2); font-size: 14px; margin: 0; }
+  .feat .desc code { font-size: 12.5px; background: rgba(148,163,184,.1); padding: 1px 5px; border-radius: 4px; color: #cbd5e1; }
+  .feat .warn { grid-column: 1 / 2; font-size: 12.5px; color: var(--gold); margin: 2px 0 0; }
+  .feat .warn.no { color: #f87171; }
+  .picks { grid-row: 1 / span 3; grid-column: 2; display: flex; flex-direction: column; gap: 5px; align-self: start; }
+  .picks button { border: 1px solid var(--border); background: transparent; color: var(--text-2); border-radius: 8px;
+                  padding: 5px 10px; font: 700 11px 'Outfit'; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; min-width: 74px; }
+  .picks button.must.on { background: rgba(34,197,94,.15); color: var(--green); border-color: rgba(34,197,94,.6); }
+  .picks button.maybe.on { background: rgba(234,179,8,.13); color: var(--gold); border-color: rgba(234,179,8,.6); }
+  .picks button.skip.on { background: rgba(239,68,68,.12); color: #f87171; border-color: rgba(239,68,68,.5); }
+  .note { grid-column: 1 / 2; margin-top: 4px; }
+  .note input { width: 100%; background: rgba(2,6,23,.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+                padding: 6px 10px; font: 13px 'Outfit'; }
+  .note input::placeholder { color: var(--muted); }
+  .note input:focus { outline: none; border-color: var(--blue); }
+
+  /* comparison table */
+  .cmp { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .cmp th, .cmp td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .cmp tr:last-child td { border-bottom: 0; }
+  .cmp th { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); background: rgba(15,23,42,.8); }
+  .cmp td:first-child { font-weight: 700; white-space: nowrap; }
+  .cmp td { color: var(--text-2); background: rgba(15,23,42,.45); }
+  .cmp-wrap { overflow-x: auto; }
+
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+  .shots figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; text-align: center; }
+
+  .gnotes textarea { width: 100%; min-height: 220px; resize: vertical; background: rgba(15,23,42,.6); border: 1px solid var(--border);
+                     border-radius: 14px; color: var(--text); padding: 14px 16px; font: 14px/1.6 'Outfit'; }
+  .gnotes textarea::placeholder { color: var(--muted); }
+  .gnotes textarea:focus { outline: none; border-color: var(--blue); }
+  .gnotes .saved { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 18px; }
+
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 16px; width: min(720px, 92vw); padding: 20px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog textarea { width: 100%; height: 50vh; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+                    padding: 12px; font: 12.5px ui-monospace, monospace; }
+  dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+  @media (max-width: 640px) {
+    .feat { grid-template-columns: 1fr; }
+    .picks { grid-row: auto; grid-column: 1; flex-direction: row; }
+    .picks button { flex: 1; min-width: 0; }
+    .counts { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">SoloLeveling · Feature Inventory</div>
+    <h1>Every feature in <span>LevelUp</span> &amp; <span>THE-SYSTEM</span></h1>
+    <p class="lead">Each card is one feature, taken from the code, not just the READMEs. Mark each one <b>Must</b>, <b>Maybe</b> or <b>Skip</b>, and add a note if you want it changed (e.g. "rename Spirit → Soul"). Your picks save in this browser. When you're done, hit <b>Export picks</b> and paste the result back to Claude.</p>
+    <div class="legend">
+      <div><span class="tag LU">LevelUp</span> from LevelUp</div>
+      <div><span class="tag TS">System</span> from THE-SYSTEM</div>
+      <div><span class="tag pwa-partial">PWA: partial</span> works differently in a web app</div>
+      <div><span class="tag pwa-no">PWA: no</span> can't be done as a PWA</div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="seg" id="srcFilter">
+      <button data-v="all" class="on">All</button>
+      <button data-v="LU">LevelUp</button>
+      <button data-v="TS">System</button>
+    </div>
+    <div class="seg" id="pickFilter">
+      <button data-v="all" class="on">Any</button>
+      <button data-v="none">Unmarked</button>
+      <button data-v="must">Must</button>
+      <button data-v="maybe">Maybe</button>
+      <button data-v="skip">Skip</button>
+    </div>
+    <div class="counts" id="counts"></div>
+    <button class="btn ghost" id="resetBtn">Clear picks</button>
+    <button class="btn" id="exportBtn">Export picks</button>
+  </div>
+
+  <nav class="toc" id="toc"></nav>
+
+  <section class="cat" id="compare">
+    <h2>Side-by-side: where the two apps overlap</h2>
+    <p class="sub">Both apps solve some of the same problems in different ways. For each row we'll pick one approach or blend them.</p>
+    <div class="cmp-wrap">
+    <table class="cmp">
+      <thead><tr><th>Concept</th><th>LevelUp</th><th>THE-SYSTEM</th></tr></thead>
+      <tbody>
+        <tr><td>Unit of work</td><td>One-off <b>Quests</b> (expire in ~24h), mostly AI-generated</td><td>Recurring <b>Disciplines</b> (daily habits) you define once</td></tr>
+        <tr><td>Difficulty</td><td>Easy / Medium / Hard as a label. XP is set per quest (by you or the AI)</td><td>EASY / NORMAL / HARD / LEGENDARY, each with default <b>gain/loss</b>: 10/5, 25/15, 50/30, 100/0</td></tr>
+        <tr><td>Failing</td><td>Missed deadline: quest removed, lose 25% of its XP (can drop you a level)</td><td>Tap <b>Fail</b> or leave it undone: lose the discipline's XP. XP never goes below 0, and you never lose a level</td></tr>
+        <tr><td>Streak</td><td>One global daily streak, +1% XP per day with no cap</td><td>Per-discipline streak multipliers: 7d ×1.5, 14d ×2, 30d ×3, 90d ×4</td></tr>
+        <tr><td>Level curve</td><td>130 XP for level 2, then each level costs ×1.5 more (gets steep fast)</td><td>Fixed table to Lv 30: 300, 700, 1200 … 87,500 total</td></tr>
+        <tr><td>Ranks</td><td>E (1), D (6), C (11), B (21), A (31), S (41), with titles like "C-Rank Focused Engineer"</td><td>E 1–5, D 6–10, C 11–15, B 16–20, A 21–25, S 26+. Titles: Awakened → Tested → Disciplined → Forged → Sovereign → Transcendent</td></tr>
+        <tr><td>Categories</td><td>8 <b>Realms</b> (Mind, Body, Creation, Spirit, Creativity, Finance, Social, Meta); 4 shown in the header</td><td>4 <b>Attributes</b> (Willpower, Strength, Vitality, Knowledge), calculated from your logs</td></tr>
+        <tr><td>Rewards</td><td>Credits + Gems currency, store, buffs, daily lootbox, staking</td><td>No currency. <b>Mandates</b> (loot chests) on level-up give cosmetics</td></tr>
+        <tr><td>Focus mode</td><td>Timer quest: XP from estimated minutes, bonus for finishing early</td><td>Shield: 15/25/45 min, fails if you leave the app</td></tr>
+        <tr><td>Long horizon</td><td>Major Goals with deadlines (exams, projects, events)</td><td>A fixed 180-day journey, a 24-node map and a Final Judgement</td></tr>
+        <tr><td>Storage</td><td>Browser localStorage, single device</td><td>On-device SQLite, single device</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <div id="features"></div>
+
+  <section class="cat" id="screens">
+    <h2>THE-SYSTEM screenshots</h2>
+    <p class="sub">For reference when we decide on the UI. They load from the repo folder next to this project.</p>
+    <div class="shots">
+      <figure><img src="../../THE-SYSTEM/docs/screenshots/command.png" alt="Command Hall" loading="lazy"><figcaption>Command Hall</figcaption></figure>
+      <figure><img src="../../THE-SYSTEM/docs/screenshots/ascend.png" alt="Ascension Path" loading="lazy"><figcaption>Ascension Path</figcaption></figure>
+      <figure><img src="../../THE-SYSTEM/docs/screenshots/mirror.png" alt="Mirror" loading="lazy"><figcaption>Mirror</figcaption></figure>
+      <figure><img src="../../THE-SYSTEM/docs/screenshots/codex.png" alt="Codex" loading="lazy"><figcaption>Codex</figcaption></figure>
+      <figure><img src="../../THE-SYSTEM/docs/screenshots/archive.png" alt="Archive" loading="lazy"><figcaption>Archive</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="cat gnotes" id="notes">
+    <h2>General notes</h2>
+    <p class="sub">Overall direction and rules for the build that aren't tied to one feature. Saved automatically and included in the export.</p>
+    <textarea id="generalNotes" placeholder="e.g. Keep it minimal on mobile. Categories: Creation, Mind, Body, Soul. No currency grind…"></textarea>
+    <div class="saved" id="notesSaved"></div>
+  </section>
+</div>
+
+<dialog id="exportDlg">
+  <h3 style="margin:0 0 10px">Your picks</h3>
+  <textarea id="exportText" readonly></textarea>
+  <div class="row">
+    <button class="btn ghost" id="dlBtn">Download .md</button>
+    <button class="btn ghost" id="closeBtn">Close</button>
+    <button class="btn" id="copyBtn">Copy</button>
+  </div>
+</dialog>
+
+<script>
+// pwa: undefined = fine as a PWA, 'partial' = works with caveats, 'no' = not possible in a PWA
+const CATS = [
+  { id: 'tasks', title: 'Quests & Tasks (LevelUp)', sub: 'One-off tasks, usually created by the AI each day.' },
+  { id: 'disc', title: 'Disciplines (THE-SYSTEM)', sub: 'Recurring daily habits with a difficulty level and a deadline. This is the "sleep by 10:30, Hard" mechanic.' },
+  { id: 'prog', title: 'Levels, Ranks & Stats', sub: 'How XP turns into levels, ranks and categories.' },
+  { id: 'skills', title: 'Skills & Knowledge (LevelUp)', sub: 'A skill tree where you add study topics and grade how hard each one is.' },
+  { id: 'streaks', title: 'Streaks & the Silence Protocol', sub: 'Rewards for consistency, and what happens when you break a streak.' },
+  { id: 'goals', title: 'Goals, Arcs & the Journey', sub: 'Long-term structure.' },
+  { id: 'econ', title: 'Economy: Credits, Store, Lootbox, Staking (LevelUp)', sub: 'Earn currency and spend it.' },
+  { id: 'loot', title: 'Mandates & Cosmetics (THE-SYSTEM)', sub: 'Loot chests and gear you equip.' },
+  { id: 'badges', title: 'Achievements', sub: '' },
+  { id: 'reflect', title: 'Reflection, Logs & History', sub: '' },
+  { id: 'analytics', title: 'Analytics', sub: '' },
+  { id: 'focus', title: 'Focus & Screen Time', sub: '' },
+  { id: 'ai', title: 'AI Features (LevelUp, Gemini)', sub: 'In LevelUp all of these need a Gemini API key; everything else works without one. We could swap in Claude or any other model.' },
+  { id: 'notif', title: 'Notifications & Reminders', sub: '' },
+  { id: 'identity', title: 'Onboarding, Identity & Avatar', sub: '' },
+  { id: 'fx', title: 'Visuals, Animation & Feel', sub: '' },
+  { id: 'data', title: 'Data, Settings & Dev Tools', sub: '' },
+];
+
+const F = [
+  // ---- Quests (LevelUp)
+  ['tasks','LU','Daily quest board','A board of active quests. Each has a title, description, realm, difficulty (Easy/Medium/Hard), XP reward, credit reward and estimated minutes. Tap <b>Complete</b> to claim the rewards.'],
+  ['tasks','LU','Manual quest creation','Add your own quest: title, description, realm, difficulty, XP, credits, estimated minutes. It gets a 24h deadline and a penalty of 25% of its XP.'],
+  ['tasks','LU','Quest deadlines + live countdown','Every quest shows a live countdown (d/h/m/s). When time runs out it is removed and the penalty (XP or credits) is applied. Penalties can drop your level.'],
+  ['tasks','LU','Mystery quests','The objective stays hidden until you engage with it, and there is no failure penalty.'],
+  ['tasks','LU','Quest chains','Multi-part quests ("Part 1 of 3") for bigger topics. The next part comes after you finish the current one.'],
+  ['tasks','LU','Boss quests','A special high-stakes quest that appears when a Major Goal (e.g. an exam) is less than 3 days away. Counts toward "bosses defeated".'],
+  ['tasks','LU','Weekly Mega Boss','Once a week, one huge quest worth ~25% of the XP you need for your next level, plus 100–250 credits.'],
+  ['tasks','LU','Quest source tags','Each quest records where it came from: you, the AI system, the AI chat, Google Calendar or GitHub.'],
+  ['tasks','LU','Link quests to knowledge topics','Quests can reference topics from your skill tree (e.g. "Convolution and Filters").'],
+  ['tasks','LU','Quest re-roll','Throw away today\'s set and generate a fresh batch. Available as a store item.'],
+
+  // ---- Disciplines (THE-SYSTEM)
+  ['disc','TS','Recurring daily disciplines','Habits that come back every day, like "Night Silence: phone down, lights off before 23:00". Each day you either complete or fail each one.'],
+  ['disc','TS','4 difficulty tiers with XP gain / loss','<code>EASY +10/−5</code>, <code>NORMAL +25/−15</code>, <code>HARD +50/−30</code>, <code>LEGENDARY +100/−0</code>. Picking a tier sets both values.'],
+  ['disc','TS','Deadline time per discipline','Each discipline has a cutoff time (HH:MM), e.g. Rise by 08:30 or Rest by 23:00.'],
+  ['disc','TS','Custom disciplines','Create your own: name, description, difficulty and deadline.'],
+  ['disc','TS','Complete or Fail buttons','Two buttons per card. Admitting a fail costs XP right away. Honest self-reporting is part of the design.'],
+  ['disc','TS','Enable / disable / delete','The built-in disciplines can be disabled but not deleted. Custom ones can be deleted (their logs go too). Disabling Silence asks for confirmation.'],
+  ['disc','TS','8 starter disciplines','RISE (wake by 08:30, Hard), REST (lights off by 23:00, Hard), NOURISH (clean meal, Normal), SILENCE (Legendary), FORGE (gym/cardio, Hard), KNOWLEDGE (10 pages, Normal), PRESENCE (social media under 30 min, Normal), RITUAL (skincare, Easy).'],
+  ['disc','TS','Per-discipline streak multiplier','XP for a discipline grows with its own streak: <code>7d ×1.5</code>, <code>14d ×2</code>, <code>30d ×3</code>, <code>90d ×4</code>.'],
+  ['disc','TS','Automatic end-of-day settlement','When the app opens, every past day is closed out. Anything left unresolved is marked failed and you lose its XP. Today stays open until midnight.','partial','A server can do this at midnight even when the app is closed, which is better than the original.'],
+  ['disc','TS','"X of Y trials undone" counter','The Command Hall shows how many of today\'s disciplines are still open.'],
+  ['disc','TS','Weekly / specific-day frequency','The database has <code>frequency</code> and <code>active_days</code> fields (e.g. gym only Mon/Wed/Fri), but the original UI only supports daily. Listed in case you want it built.'],
+
+  // ---- Progression
+  ['prog','LU','Overall level, steep curve','Level 2 costs 130 XP and each level after that costs ×1.5 more. XP carries over between levels.'],
+  ['prog','TS','Overall level, fixed XP table','A hand-tuned table up to level 30 (300, 700, 1200, 1800 … 87,500 total XP). Gentler and easier to predict.'],
+  ['prog','LU','De-leveling','Penalties can push XP below the current level\'s floor and drop you a level (and a rank).'],
+  ['prog','TS','XP floor, no de-leveling','XP never goes below 0 and you never lose a level you earned.'],
+  ['prog','LU','Ranks E→S with custom titles','E (Lv 1), D (6), C (11), B (21), A (31), S (41), with titles like "B-Rank Builder of Systems".'],
+  ['prog','TS','Ranks E→S every 5 levels','E 1–5, D 6–10, C 11–15, B 16–20, A 21–25, S 26+. Titles: The Awakened, Tested, Disciplined, Forged, Sovereign, Transcendent.'],
+  ['prog','LU','Realms (categories)','8 realms: Mind, Body, Creation, Spirit, Creativity, Finance, Social, Meta. Each completed quest adds +1 to its realm\'s stat. The 4 main ones show in the header. <i>(You want Spirit → Soul, and to rework the list later.)</i>'],
+  ['prog','TS','Attributes calculated from logs','Willpower, Strength, Vitality, Knowledge. Each discipline feeds one. Every 300 net XP is one attribute level, and fails pull it back down. They are computed from history rather than stored, so they always match the logs.'],
+  ['prog','TS','Mood','Shown on the character screen: Radiant (≥90% of today done), Steady, Worn (≥30%), Broken. It changes how your avatar looks.'],
+  ['prog','LU','Header stat bar','Avatar with a LVL badge, name, rank, streak flame, buff icon, the 4 realm stats and a full-width XP bar.'],
+
+  // ---- Skills
+  ['skills','LU','Skill tree','Custom skills grouped by realm (e.g. "Machine Learning" in Mind). Each has a level, XP, a 1–5 priority, an active/paused switch and an XP scale (harder skills level more slowly).'],
+  ['skills','LU','Knowledge topics per skill','Topics under each skill, graded Easy (25), Medium (50), Hard (100) or Super Hard (200 XP). Changing a topic\'s grade recalculates the skill level and your overall XP.'],
+  ['skills','LU','Bulk topic add','Paste a list of topics into a skill in one go.'],
+  ['skills','LU','Search topics','Search box across all knowledge topics.'],
+  ['skills','LU','Pause a skill','A paused skill hides its linked Major Goals and the AI stops generating quests for it.'],
+  ['skills','LU','Realm radar chart','A radar chart of your balance across realms.'],
+
+  // ---- Streaks
+  ['streaks','LU','Global daily streak','+1 for each day you complete at least one quest. Each streak day adds +1% to all XP, with no cap.'],
+  ['streaks','TS','Per-discipline streaks','Each discipline tracks its own run of consecutive completed days, which feeds its multiplier.'],
+  ['streaks','LU','Streak Shield','An item that protects your streak for one missed day. <i>(It can be bought but its effect was never implemented.)</i>'],
+  ['streaks','LU','Instant 3-Day Streak','An item that sets your streak to 3 straight away.'],
+  ['streaks','TS','Silence Protocol (days-clean counter)','A LEGENDARY abstinence discipline (the original is NoFap; it could be anything: smoking, junk food, porn, doomscrolling). Shows a big "days clean" counter, longest streak and total relapses.'],
+  ['streaks','TS','"I HAVE FALLEN" relapse button','Breaking Silence <b>wipes all progress</b> (XP, level, logs, mandates, cosmetics) but keeps your name, star and relapse record. Disciplines lock for the rest of the day and the journey restarts tomorrow. Very harsh by design.'],
+
+  // ---- Goals
+  ['goals','LU','Major Goals','Long-term "boss" goals of three types: Siege (exam), Forge (project), Gauntlet (event). Each has a deadline, XP and credit rewards, a penalty for missing it, a syllabus and a linked skill. Tap "Claim Victory" when done.'],
+  ['goals','LU','"Past due" state for goals','When a goal\'s deadline passes, the penalty is applied and the goal is removed.'],
+  ['goals','LU','My State','Free-text fields: Core Mission, Long-term Goals, Short-term Goals, Emergency Goals, Side Quests. The AI uses them as context.'],
+  ['goals','LU','Story Arcs','Themed periods (e.g. "Exam Week", "Project Phoenix Body") with listed effects such as "Body XP ×1.5". Create, activate, deactivate and delete them. <i>(In the original the effects are only text; they don\'t change any math.)</i>'],
+  ['goals','TS','180-day Journey','A fixed 6-month campaign with a "Day X / 180" counter and a set start date.'],
+  ['goals','TS','Ascension Path map','A 24-node map (~7.5 days per node) across 6 regions: The Abyss, Ruined Kingdom, Iron Citadel, Celestial Gate, Void Expanse, The Throne. Each node shows its completion % and a line of lore ("Week 9: Iron sky. Iron will.").'],
+  ['goals','TS','Final Judgement','On day 180 you get a verdict based on your completion rate: Transcendent (≥85%), Sovereign (≥70%), Forged (≥50%), Tested (≥30%), Unrealized.'],
+
+  // ---- Economy
+  ['econ','LU','Wallet: Credits & Gems','Two currencies. Credits come from quests; Gems are rare drops.'],
+  ['econ','LU','Daily Lootbox ("Daily Payload")','One free roll per day: 50% 25–75 credits, 25% 25–75 XP, 10% 1–2 gems, 15% a random item. Your streak adds +2% per day (up to +100%) and +1 gem per 10 streak days.'],
+  ['econ','LU','Store','Buy items with credits. Buffs (Focus/Body/Creative/Spirit Surge: ×2 XP in that realm for 24h; Trinity; Omni ×2 on everything), utilities (Streak Shield, Re-roll, Instant Streak), and real-life rewards.'],
+  ['econ','LU','Real-world rewards','Store items that are permission slips for real treats, e.g. "Coffee Reward: 100 credits". You set the prices, so you earn your treats.'],
+  ['econ','LU','Custom store items','Add, edit and delete your own items with a cost, category and effect.'],
+  ['econ','LU','Inventory','Items you own, with quantities, and a button to use each one.'],
+  ['econ','LU','Active buffs with expiry','Running buffs show a live countdown and disappear when they expire. A pulsing icon appears in the header while any buff is active.'],
+  ['econ','LU','Credit staking','Lock credits for a permanent passive XP boost. How much you can stake rises with level (level × 100). You can withdraw at any time.'],
+  ['econ','LU','Buff infusion','Permanently use up a buff item for a stacking passive bonus. The number of infusions per buff is <code>floor(level/10)+1</code>.'],
+  ['econ','LU','Reward toast','A pop-up showing base reward → final reward after buffs and streak (e.g. "+50 → +68 XP").'],
+
+  // ---- Loot / cosmetics
+  ['loot','TS','Mandates (loot chests)','Every level-up grants a chest: Bronze normally, Silver every 5th level, Gold every 10th. You can only hold one unopened chest at a time.'],
+  ['loot','TS','Petition','Ask for a free Bronze mandate once every 7 days.'],
+  ['loot','TS','Loot tables','Bronze: motivational scroll (60%), common title, accessory. Silver: weapon/armor skin, background, rare title. Gold: equipment tier, aura, legendary title.'],
+  ['loot','TS','Chest-opening reveal','A full-screen "Mandate received → Open" animation that shows what you got.'],
+  ['loot','TS','Cosmetics & auto-equip','Slots for weapon, armor, crown, accessory, aura, background and title. A better-tier drop equips itself.'],
+  ['loot','TS','Cosmetics recolor the app','An equipped background tints the whole app (Volcanic Ruins, Frozen Throne…). An equipped aura recolors the particles and avatar glow (Crimson, Frost, Shadow, Divine).'],
+  ['loot','TS','Titles','Unlockable titles shown with your name ("Dawn Riser", "Void Walker", "The Unbroken").'],
+
+  // ---- Badges
+  ['badges','LU','Badges / achievements','10 built-in badges: Level 10/25, First Quest, 10/50 Quests, Boss Slayer, and Mind/Body/Creation/Spirit Adept (a skill at Lv 5). They unlock automatically.'],
+  ['badges','LU','Custom badges','Create, edit and delete your own badges with an icon.'],
+
+  // ---- Reflection
+  ['reflect','LU','Journal / After-Action Review','After finishing a Major Goal, write a reflection. You get +25 XP (Spirit) and the AI turns it into small "fix-it" quests.'],
+  ['reflect','LU','Story Log','A narrative log of your journey, written in chapters ("Week 1: The Awakening").'],
+  ['reflect','LU','System Log','A feed of in-app system messages: rewards, failures, buffs expiring, errors.'],
+  ['reflect','TS','Archive: Overview','Total XP, current rank, best streak, relapses, mandates opened, journey day.'],
+  ['reflect','TS','Archive: History','A day-by-day log of every discipline you completed or failed.'],
+  ['reflect','TS','Archive: Streaks & Missions','Current and best streak for each discipline, plus each one\'s full log.'],
+  ['reflect','TS','28-day heatmap','A grid of the last 28 days tied to your journey, with future days shown as upcoming.'],
+  ['reflect','TS','Daily quote','A random motivational quote on the home screen (99 of them).'],
+
+  // ---- Analytics
+  ['analytics','LU','KPI cards','Quests Completed, Total XP, Daily Streak, Bosses Defeated.'],
+  ['analytics','LU','Weekly XP chart','A bar or line chart of XP gained each day this week.'],
+  ['analytics','LU','Realm distribution pie','How your completed quests split across realms.'],
+  ['analytics','LU','Realm activity heatmaps','A GitHub-style heatmap for each realm.'],
+  ['analytics','LU','Top 5 skills','Your highest-level skills.'],
+  ['analytics','LU','System Mechanics page','An in-app page that explains the formulas: XP curve, streak bonus, penalties, rank table, skill XP scaling.'],
+
+  // ---- Focus
+  ['focus','LU','Timed quest (focus timer)','Start an ad-hoc timer: title, realm, estimated minutes. Reward is 1.5 XP and 0.5 credits per estimated minute, plus up to +50% for finishing early.'],
+  ['focus','TS','Shield Protocol','A focus session of 15, 25 or 45 minutes. Leaving the app breaks the session ("Fortress breached"); staying to the end wins ("Fortress held"). Keeps the screen awake.','partial','In a PWA, leaving can be detected with the visibilitychange event and the screen kept on with the Wake Lock API. Works on Android Chrome.'],
+  ['focus','TS','The Veil: automatic screen-time tracking','Reads your actual Instagram/TikTok usage from Android and passes or fails the discipline at ≤30 min.','no','A PWA cannot read other apps\' usage. Options: enter the minutes yourself, or use a small companion (e.g. Tasker/Automate) that posts the number to your server.'],
+
+  // ---- AI
+  ['ai','LU','AI daily quest generation','Generates 3–5 quests from your skills, goals, My State, calendar, GitHub activity and recent chat. Always includes one Body quest, scales XP with your level, and adds bosses and chains when needed.'],
+  ['ai','LU','AI Mentor chat with actions','A chat where the AI can act on the app: add or complete quests, add or complete Major Goals, buy or use items, and update My State.'],
+  ['ai','LU','AI syllabus breakdown','Paste an exam syllabus and the AI splits it into knowledge topics for the linked skill.'],
+  ['ai','LU','AI Major Goal generation (bulk)','Describe what you\'re working toward and get several goals with XP sized to your next ~6 levels.'],
+  ['ai','LU','AI skill & topic recommendations','Suggests new skills and topics, with a reason for each, based on your profile and goals.'],
+  ['ai','LU','AI-generated arcs, badges, store items','Describe one in words and the AI fills in the structured fields.'],
+  ['ai','LU','AI journal → improvement checklist','Turns a reflection into small follow-up quests.'],
+  ['ai','LU','Works without an API key','Every non-AI feature works without a key; the AI features unlock when you add one.'],
+
+  // ---- Notifications
+  ['notif','TS','Interval reminders','Reminders every N hours: "3 of 8 trials still undone. Day 42. Claim it." Scheduled a week ahead.','partial','A PWA on Android can receive Web Push sent from your Hetzner server, so this works and is more reliable than the original.'],
+  ['notif','TS','Quiet hours','No reminders between your chosen start and end times (default 00:00–07:00).'],
+  ['notif','TS','Rich notification banners','Notifications show a picture of your avatar for your class and rank.','partial','Web Push supports images on Android Chrome, but not the custom native layouts the original uses.'],
+  ['notif','TS','Test notification','A button in Settings that sends a test notification.'],
+  ['notif','LU','In-app system messages only','LevelUp has no push notifications, only the in-app System Log.'],
+
+  // ---- Identity
+  ['identity','LU','Name entry + profile picture','Prompts for your name on first run. Upload a photo or use a generated initials avatar.'],
+  ['identity','LU','Google sign-in','Optional Google OAuth (used for Calendar).'],
+  ['identity','TS','"Awakening" onboarding','A cinematic intro: "THE SYSTEM HAS DETECTED A CANDIDATE" → "IDENTIFY YOURSELF" (name) → choose your star → "YOUR COVENANT BEGINS" → accept → allow notifications.'],
+  ['identity','TS','Star avatar (choose 1 of 3)','Antares (red, "a relentless, burning force"), Polaris ("steady guidance"), Altair ("quick, sharp"). This is your class.'],
+  ['identity','TS','Avatar evolves with rank','E: dim. D: halo. C: ring. B: orbiting mote. A: spinning, 2 motes. S: corona and 3 motes.'],
+  ['identity','TS','Mirror (character sheet)','Avatar with mood, level, rank, title, attributes with progress bars, and your equipment and backgrounds collection.'],
+
+  // ---- FX
+  ['fx','LU','Glassmorphism dark UI','Deep navy (#020617), frosted-glass panels, blue/gold/purple glows, Outfit font, bold uppercase labels. <b>This is the UI you liked.</b>'],
+  ['fx','LU','Level-up generative art','A full-screen celebration that picks one of ~25 generative animations (Lorenz attractor, Game of Life, spirographs, Lissajous curves, particle vortices) and shows your new level and rank.'],
+  ['fx','LU','Level-up sound','A sound effect when you level up.'],
+  ['fx','LU','Pulsing streak & buff icons','The streak flame glows and pulses, and so does the buff icon.'],
+  ['fx','LU','Responsive nav','A sidebar on desktop; a bottom tab bar on mobile (Quests, Skills, System, Inventory, More).'],
+  ['fx','LU','Save indicator','Shows "Saving… / Saved / Save Error" in the header.'],
+  ['fx','TS','Rank-themed palette','Warm charcoal with a coral accent that gets warmer and more golden from E to S. The whole app changes theme when you rank up.'],
+  ['fx','TS','Ambient particles','Floating embers and motes that change by rank: motes, then sparks, then god rays at S.'],
+  ['fx','TS','"Age of Empires" panel styling','Corner-bracket frames, pixel borders, section dividers, a Lora serif display font. Panels get grander at higher ranks (system → arcane → monarch, animated at S).'],
+  ['fx','TS','Level-up splash & Rank Ascension','A full-screen "Level achieved" screen, plus a separate "Rank ascension" screen when your rank changes.'],
+  ['fx','TS','S-Rank cutscene','A 6-frame cinematic when you reach S rank ("SIX MONTHS. NOT A SINGLE DAY WASTED." … "YOU ARE TRANSCENDENT.").'],
+
+  // ---- Data
+  ['data','LU','JSON backup / restore','Download your full save as a file, and restore from one.'],
+  ['data','TS','Export / import with validation','The import file is checked before anything is overwritten.'],
+  ['data','LU','Reset progress','Wipes the saved data.'],
+  ['data','TS','Reset requires a typed phrase','You must type "I ACCEPT THE RESET" exactly.'],
+  ['data','LU','Integrations toggles','Google Calendar (quests built around your schedule) and GitHub (coding activity → code quests).'],
+  ['data','LU','Dev testing panel','Time travel (+1h/+6h/+1d/+7d), add XP/credits/gems, set streak and stats, add test quests, reset lootbox, simulate errors, run diagnostics and repair broken links.'],
+  ['data','BOTH','Single-device, no sync','Both apps store data on one device. With your Hetzner backend we can sync across phone, laptop etc. (a new feature).'],
+];
+
+const STORE_KEY = 'sl-feature-picks-v1';
+let state = {};
+try { state = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch (e) { state = {}; }
+const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} };
+
+const srcLabel = { LU: 'LevelUp', TS: 'System', BOTH: 'Both' };
+const counters = {};
+const items = F.map((f, i) => {
+  const [cat, src, name, desc, pwa, pwaNote] = f;
+  const prefix = { tasks:'Q', disc:'D', prog:'P', skills:'K', streaks:'S', goals:'G', econ:'E', loot:'M', badges:'B', reflect:'R', analytics:'A', focus:'F', ai:'AI', notif:'N', identity:'I', fx:'V', data:'X' }[cat];
+  counters[prefix] = (counters[prefix] || 0) + 1;
+  return { id: prefix + counters[prefix], cat, src, name, desc, pwa, pwaNote };
+});
+
+const root = document.getElementById('features');
+const toc = document.getElementById('toc');
+toc.innerHTML = '<a href="#compare">Overlap</a>' + CATS.map(c => `<a href="#cat-${c.id}">${c.title.replace(/\s*\(.*\)/, '')}</a>`).join('') + '<a href="#screens">Screens</a><a href="#notes">Notes</a>';
+
+// General notes live in the same saved state under a reserved key
+const notesEl = document.getElementById('generalNotes');
+const notesSaved = document.getElementById('notesSaved');
+notesEl.value = state._generalNotes || '';
+let notesTimer;
+notesEl.addEventListener('input', () => {
+  state._generalNotes = notesEl.value;
+  save();
+  clearTimeout(notesTimer);
+  notesSaved.textContent = 'Saved ✓';
+  notesTimer = setTimeout(() => notesSaved.textContent = '', 1500);
+});
+
+CATS.forEach(c => {
+  const list = items.filter(it => it.cat === c.id);
+  const sec = document.createElement('section');
+  sec.className = 'cat'; sec.id = 'cat-' + c.id;
+  sec.innerHTML = `<h2>${c.title} <span class="n">${list.length}</span></h2>` + (c.sub ? `<p class="sub">${c.sub}</p>` : '');
+  list.forEach(it => {
+    const s = state[it.id] || {};
+    const el = document.createElement('div');
+    el.className = 'feat'; el.dataset.id = it.id; el.dataset.src = it.src; el.dataset.pick = s.pick || '';
+    const pwaTag = it.pwa ? `<span class="tag pwa-${it.pwa}">PWA: ${it.pwa}</span>` : '';
+    el.innerHTML = `
+      <div class="top"><span class="name">${it.name}</span><span class="tag ${it.src}">${srcLabel[it.src]}</span>${pwaTag}<span class="id">${it.id}</span></div>
+      <div class="picks">
+        <button class="must ${s.pick==='must'?'on':''}" data-p="must">Must</button>
+        <button class="maybe ${s.pick==='maybe'?'on':''}" data-p="maybe">Maybe</button>
+        <button class="skip ${s.pick==='skip'?'on':''}" data-p="skip">Skip</button>
+      </div>
+      <p class="desc">${it.desc}</p>
+      ${it.pwaNote ? `<p class="warn ${it.pwa==='no'?'no':''}">⚠ ${it.pwaNote}</p>` : ''}
+      <div class="note"><input type="text" placeholder="Note / change (optional)" value="${(s.note||'').replace(/"/g,'&quot;')}"></div>`;
+    el.querySelectorAll('.picks button').forEach(b => b.addEventListener('click', () => {
+      const cur = (state[it.id] || {}).pick;
+      const next = cur === b.dataset.p ? '' : b.dataset.p;
+      state[it.id] = { ...(state[it.id] || {}), pick: next };
+      el.dataset.pick = next;
+      el.querySelectorAll('.picks button').forEach(x => x.classList.toggle('on', x.dataset.p === next));
+      save(); updateCounts(); applyFilters();
+    }));
+    el.querySelector('.note input').addEventListener('input', e => {
+      state[it.id] = { ...(state[it.id] || {}), note: e.target.value };
+      save();
+    });
+    sec.appendChild(el);
+  });
+  root.appendChild(sec);
+});
+
+let srcF = 'all', pickF = 'all';
+function applyFilters() {
+  document.querySelectorAll('.feat').forEach(el => {
+    const srcOk = srcF === 'all' || el.dataset.src === srcF || el.dataset.src === 'BOTH';
+    const p = el.dataset.pick;
+    const pickOk = pickF === 'all' || (pickF === 'none' ? !p : p === pickF);
+    el.style.display = srcOk && pickOk ? '' : 'none';
+  });
+  document.querySelectorAll('section.cat[id^="cat-"]').forEach(sec => {
+    const any = [...sec.querySelectorAll('.feat')].some(f => f.style.display !== 'none');
+    sec.style.display = any ? '' : 'none';
+  });
+}
+function bindSeg(id, setter) {
+  const seg = document.getElementById(id);
+  seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    setter(b.dataset.v); applyFilters();
+  }));
+}
+bindSeg('srcFilter', v => srcF = v);
+bindSeg('pickFilter', v => pickF = v);
+
+function updateCounts() {
+  const c = { must: 0, maybe: 0, skip: 0 };
+  items.forEach(it => { const p = (state[it.id] || {}).pick; if (p) c[p]++; });
+  const un = items.length - c.must - c.maybe - c.skip;
+  document.getElementById('counts').innerHTML =
+    `<span><b>${items.length}</b> features</span><span style="color:var(--green)"><b>${c.must}</b> must</span><span style="color:var(--gold)"><b>${c.maybe}</b> maybe</span><span style="color:#f87171"><b>${c.skip}</b> skip</span><span><b>${un}</b> unmarked</span>`;
+}
+updateCounts();
+
+function buildExport() {
+  const groups = { must: [], maybe: [], skip: [], unmarked: [] };
+  items.forEach(it => {
+    const s = state[it.id] || {};
+    const line = `- ${it.id} ${it.name} [${srcLabel[it.src]}]` + (s.note ? ` — NOTE: ${s.note}` : '');
+    groups[s.pick || 'unmarked'].push(line);
+  });
+  return `# SoloLeveling feature picks (${new Date().toISOString().slice(0,10)})\n\n` +
+    `## MUST (${groups.must.length})\n${groups.must.join('\n') || '- none'}\n\n` +
+    `## MAYBE (${groups.maybe.length})\n${groups.maybe.join('\n') || '- none'}\n\n` +
+    `## SKIP (${groups.skip.length})\n${groups.skip.join('\n') || '- none'}\n\n` +
+    `## UNMARKED (${groups.unmarked.length})\n${groups.unmarked.join('\n') || '- none'}\n\n` +
+    `## GENERAL NOTES\n${(state._generalNotes || '').trim() || '- none'}\n`;
+}
+const dlg = document.getElementById('exportDlg');
+document.getElementById('exportBtn').addEventListener('click', () => {
+  document.getElementById('exportText').value = buildExport();
+  dlg.showModal();
+});
+document.getElementById('closeBtn').addEventListener('click', () => dlg.close());
+document.getElementById('copyBtn').addEventListener('click', async e => {
+  const txt = document.getElementById('exportText');
+  try { await navigator.clipboard.writeText(txt.value); } catch (err) { txt.select(); document.execCommand('copy'); }
+  e.target.textContent = 'Copied ✓'; setTimeout(() => e.target.textContent = 'Copy', 1500);
+});
+document.getElementById('dlBtn').addEventListener('click', () => {
+  const blob = new Blob([buildExport()], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'feature-picks.md'; a.click();
+  URL.revokeObjectURL(a.href);
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Clear all picks and notes, including general notes?')) return;
+  state = {}; save(); location.reload();
+});
+</script>
+</body>
+</html>

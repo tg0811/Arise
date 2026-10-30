@@ -1,0 +1,180 @@
+import { DatabaseSync } from 'node:sqlite';
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+
+export type DB = DatabaseSync;
+
+// Each entry runs once, in order; the applied count lives in PRAGMA user_version.
+const MIGRATIONS: string[] = [
+  `
+  CREATE TABLE profile (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    name TEXT NOT NULL DEFAULT '',
+    avatar TEXT,
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    onboarded INTEGER NOT NULL DEFAULT 0,
+    my_state TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+  CREATE TABLE sessions (
+    token TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+
+  CREATE TABLE categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    color TEXT NOT NULL,
+    icon TEXT NOT NULL,
+    sort INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0
+  );
+
+  -- Habits (recurring) and quests (one-off) share one table; kind decides which columns matter.
+  CREATE TABLE tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL CHECK (kind IN ('habit', 'quest')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    category_id INTEGER REFERENCES categories(id),
+    difficulty TEXT NOT NULL,
+    -- habit
+    days TEXT NOT NULL DEFAULT '0123456',
+    deadline_time TEXT,
+    -- quest
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'locked', 'done', 'failed', 'cancelled')),
+    deadline_at TEXT,
+    completed_at TEXT,
+    chain_id TEXT,
+    chain_index INTEGER,
+    chain_total INTEGER,
+    duration_hours REAL,
+    boss TEXT NOT NULL DEFAULT 'none' CHECK (boss IN ('none', 'boss', 'weekly')),
+    xp_value INTEGER,
+    -- common
+    archived INTEGER NOT NULL DEFAULT 0,
+    sort INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    created_date TEXT NOT NULL
+  );
+  CREATE INDEX tasks_kind ON tasks(kind, archived, status);
+  CREATE INDEX tasks_chain ON tasks(chain_id, chain_index);
+
+  CREATE TABLE habit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL REFERENCES tasks(id),
+    date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('done', 'failed')),
+    xp INTEGER NOT NULL,
+    auto INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    UNIQUE (task_id, date)
+  );
+
+  -- Ledgers: level, rank, attributes and wallet are all derived from these.
+  CREATE TABLE xp_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    date TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    category_id INTEGER,
+    source TEXT NOT NULL,
+    source_id INTEGER,
+    note TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX xp_events_source ON xp_events(source, source_id);
+
+  CREATE TABLE currency_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    date TEXT NOT NULL,
+    currency TEXT NOT NULL CHECK (currency IN ('credits', 'gems')),
+    amount INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    source_id INTEGER,
+    note TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX currency_events_source ON currency_events(source, source_id);
+  `,
+  `
+  ALTER TABLE profile ADD COLUMN height_cm REAL;
+
+  -- One weigh-in per day; the latest is the current weight.
+  CREATE TABLE weight_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    kg REAL NOT NULL,
+    at TEXT NOT NULL
+  );
+  `,
+  `
+  -- Social Media and Finance dropped from the defaults (2026-10-30): delete if unused, archive if they hold history.
+  UPDATE categories SET archived = 1 WHERE name IN ('Social Media', 'Finance')
+    AND (id IN (SELECT category_id FROM tasks WHERE category_id IS NOT NULL) OR id IN (SELECT category_id FROM xp_events WHERE category_id IS NOT NULL));
+  DELETE FROM categories WHERE name IN ('Social Media', 'Finance') AND archived = 0;
+  `,
+];
+
+const DEFAULT_CATEGORIES: [string, string, string][] = [
+  ['Mind', '#60a5fa', 'brain'],
+  ['Body', '#f87171', 'dumbbell'],
+  ['Soul', '#c084fc', 'sparkles'],
+  ['Intellect', '#facc15', 'book-open'],
+];
+
+export function openDb(file: string): DB {
+  if (file !== ':memory:') mkdirSync(dirname(resolve(file)), { recursive: true });
+  const db = new DatabaseSync(file);
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  migrate(db);
+  return db;
+}
+
+function migrate(db: DB) {
+  const { user_version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
+  for (let v = user_version; v < MIGRATIONS.length; v++) {
+    db.exec('BEGIN');
+    try {
+      db.exec(MIGRATIONS[v]);
+      if (v === 0) seed(db);
+      if (v === 1) db.prepare('UPDATE profile SET height_cm = 167 WHERE id = 1').run();
+      db.exec(`PRAGMA user_version = ${v + 1}`);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+}
+
+function seed(db: DB) {
+  db.prepare('INSERT INTO profile (id, created_at) VALUES (1, ?)').run(new Date().toISOString());
+  const ins = db.prepare('INSERT INTO categories (name, color, icon, sort) VALUES (?, ?, ?, ?)');
+  DEFAULT_CATEGORIES.forEach(([name, color, icon], i) => ins.run(name, color, icon, i));
+}
+
+export function getSetting(db: DB, key: string): string | null {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setSetting(db: DB, key: string, value: string) {
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+}
+
+/** Run `fn` inside a transaction. */
+export function tx<T>(db: DB, fn: () => T): T {
+  db.exec('BEGIN');
+  try {
+    const out = fn();
+    db.exec('COMMIT');
+    return out;
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}

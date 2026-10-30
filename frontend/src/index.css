@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/* Colors are CSS variables set per rank by lib/theme.ts, so the whole app re-themes on rank change. */
+@theme {
+  --font-sans: 'Outfit', system-ui, sans-serif;
+  --font-display: 'Cinzel', 'Outfit', serif;
+  --color-bg: var(--sl-bg);
+  --color-panel: var(--sl-panel);
+  --color-accent: var(--sl-accent);
+  --color-accent2: var(--sl-accent2);
+  --color-ink: var(--sl-text);
+  --color-ink2: var(--sl-text2);
+  --color-muted: var(--sl-muted);
+  --color-line: var(--sl-line);
+  --color-good: #4ade80;
+  --color-bad: #f87171;
+  --color-gold: #eab308;
+}
+
+:root {
+  /* E-rank defaults so first paint isn't unstyled before JS applies the theme */
+  --sl-bg: #1a1714;
+  --sl-panel: #26211c;
+  --sl-accent: #d97757;
+  --sl-accent2: #e3b341;
+  --sl-text: #f2ede4;
+  --sl-text2: #b3aa9b;
+  --sl-muted: #7a7266;
+  --sl-line: rgba(217, 119, 87, 0.16);
+  color-scheme: dark;
+}
+
+html, body, #root { min-height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--sl-bg);
+  color: var(--sl-text);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 1.2s ease;
+  overscroll-behavior-y: none;
+}
+
+/* Soft accent glows behind everything (LevelUp's ambient light) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 45% at 10% -5%, color-mix(in srgb, var(--sl-accent) 16%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, var(--sl-accent2) 10%, transparent), transparent 70%);
+  transition: background 1.2s ease;
+}
+
+#root { position: relative; z-index: 1; }
+
+/* In the components layer so Tailwind utilities (w-20, p-1…) can override them. */
+@layer components {
+.glass {
+  background: color-mix(in srgb, var(--sl-panel) 62%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--sl-line);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sl-muted);
+}
+
+.text-glow { text-shadow: 0 0 12px color-mix(in srgb, currentColor 60%, transparent); }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+input, textarea, select { font: inherit; color: inherit; }
+
+.field {
+  width: 100%;
+  background: color-mix(in srgb, var(--sl-bg) 70%, transparent);
+  border: 1px solid var(--sl-line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field:focus { border-color: var(--sl-accent); }
+.field::placeholder { color: var(--sl-muted); }
+
+.glass-solid {
+  background: var(--sl-panel);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--sl-line);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--sl-accent2) 50%, transparent)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sl-accent2) 90%, transparent)); }
+}
+.pulse-glow { animation: pulse-glow 2.5s ease-in-out infinite; }
+
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin-slow 14s linear infinite; }
+
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
