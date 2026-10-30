@@ -143,7 +143,7 @@ export function Rules({ s }: { s: AppState }) {
         <ul className="mb-3 space-y-2">
           <Rule>Unlocks once {clear} of today's tasks are complete. One opening per day; it doesn't carry over.</Rule>
           <Rule>Streak bonus: +{pct(LOOT_STREAK_BONUS_PER_DAY)} per streak day on credits and XP (max +{pct(LOOT_STREAK_BONUS_CAP)}), and +1 gem per {LOOT_GEM_STREAK_STEP} streak days. Yours right now: +{pct(lootStreakBonus(s.streak.current))}.</Rule>
-          <Rule>Item drops pick a random store reward marked "can drop from the daily payload".</Rule>
+          <Rule>Item drops pick a random store reward ticked "Can be won free from the daily payload". Untick your big rewards so only saving up gets them.</Rule>
         </ul>
         <Table head={['Drop', 'Chance', 'Amount']}
           rows={LOOT_ODDS.map((o) => [<span className="capitalize">{o.type}</span>, pct(o.chance), o.type === 'item' ? '1 reward' : `${o.min}–${o.max}`])} />

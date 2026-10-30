@@ -155,9 +155,12 @@ function ItemForm({ item, onDone }: { item: StoreItem | null; onDone: () => void
         </div>
         <p className="mt-1.5 text-xs text-muted">For scale: a Normal task pays 5 credits, a Hard one 10. Gems only drop from the daily payload.</p>
       </Field>
-      <label className="mb-5 flex items-center gap-3 text-sm">
-        <input type="checkbox" checked={lootable} onChange={(e) => setLootable(e.target.checked)} className="h-4 w-4 accent-[var(--sl-accent)]" />
-        Can drop from the daily payload
+      <label className="mb-5 flex items-start gap-3 text-sm">
+        <input type="checkbox" checked={lootable} onChange={(e) => setLootable(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--sl-accent)]" />
+        <span>
+          Can be won free from the daily payload
+          <span className="block text-xs text-muted">Untick for big rewards you want to earn only by saving up.</span>
+        </span>
       </label>
       <div className="flex gap-2">
         {item && (
