@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Plus, Trash2, Repeat, Swords, Skull, Crown } from 'lucide-react';
+import { Plus, Trash2, Repeat, Swords, Skull, Crown, Lock } from 'lucide-react';
 import { DIFFICULTIES, DIFFICULTY_XP, BOSS_MULTIPLIER, type Difficulty } from '@shared';
 import { useAction, type AppState, type Habit, type Quest } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
@@ -78,6 +78,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   // habit
   const [days, setDays] = useState(editingHabit?.days ?? '0123456');
   const [deadlineTime, setDeadlineTime] = useState(editingHabit?.deadlineTime ?? '');
+  const [isPrivate, setIsPrivate] = useState(editingHabit?.private ?? false);
   // quest
   const [deadline, setDeadline] = useState(toLocalInput(editingQuest ? new Date(editingQuest.deadlineAt) : endOfToday()));
   const [boss, setBoss] = useState<'none' | 'boss' | 'weekly'>('none');
@@ -88,7 +89,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
     const done = { onSuccess: () => { toast('Saved', 'good'); onDone(); }, onError: (e: Error) => toast(e.message, 'bad') };
     if (kind === 'habit') {
       if (!days) return toast('Pick at least one day', 'bad');
-      const body = { title, description, categoryId, difficulty, days, deadlineTime: deadlineTime || null };
+      const body = { title, description, categoryId, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate };
       action.mutate(editingHabit ? { method: 'PUT', path: `/habits/${editingHabit.id}`, body } : { path: '/habits', body }, done);
     } else {
       const deadlineAt = new Date(deadline).toISOString();
@@ -163,6 +164,13 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
             </div>
             <p className="mt-1.5 text-xs text-muted">Shown as "by HH:MM". You report honestly; anything unresolved fails at midnight.</p>
           </Field>
+          <label className="mb-4 flex items-start gap-3 rounded-xl border border-line p-3 text-sm">
+            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--sl-accent)]" />
+            <span>
+              <span className="flex items-center gap-1.5 font-semibold"><Lock size={13} /> Private habit</span>
+              <span className="block text-xs text-muted">Name, description and category stay hidden (• • • •) until you unlock with your password. You can still complete it while hidden.</span>
+            </span>
+          </label>
         </>
       ) : (
         <>

@@ -1,4 +1,4 @@
-import { buildState, dayProgress, getProfile, habitStreakBefore, type Ctx, type Task } from './game.ts';
+import { PRIVATE_MASK, buildState, dayProgress, getProfile, habitStreakBefore, type Ctx, type Task } from './game.ts';
 import { habitBestStreak, milestones } from './titles.ts';
 import { addDays, isScheduled, localDate } from '../../shared/engine.ts';
 
@@ -61,13 +61,21 @@ export function archiveState(ctx: Ctx, historyBefore?: string) {
   // ---- history: ledger events grouped by day, newest first, paged by HISTORY_DAYS
   const end = historyBefore ?? addDays(today, 1);
   const start = addDays(end, -HISTORY_DAYS);
-  const xpEvents = db.prepare('SELECT at, date, amount, category_id, source, note FROM xp_events WHERE date >= ? AND date < ? ORDER BY id DESC')
-    .all(start, end) as { at: string; date: string; amount: number; category_id: number | null; source: string; note: string }[];
+  const xpEvents = db.prepare('SELECT at, date, amount, category_id, source, source_id, note FROM xp_events WHERE date >= ? AND date < ? ORDER BY id DESC')
+    .all(start, end) as { at: string; date: string; amount: number; category_id: number | null; source: string; source_id: number | null; note: string }[];
   const purchases = db.prepare("SELECT at, date, amount, currency, note FROM currency_events WHERE source = 'store' AND date >= ? AND date < ? ORDER BY id DESC")
     .all(start, end) as { at: string; date: string; amount: number; currency: 'credits' | 'gems'; note: string }[];
+  // Ledger notes name the habit ("Completed: X"); mask the ones that belong to locked private habits.
+  const privateLogIds = ctx.reveal ? new Set<number>() : new Set((db.prepare(
+    'SELECT l.id FROM habit_logs l JOIN tasks t ON t.id = l.task_id WHERE t.private = 1').all() as { id: number }[]).map((r) => r.id));
+  const maskNote = (e: { source: string; source_id: number | null; note: string }) =>
+    e.source === 'habit' && e.source_id !== null && privateLogIds.has(e.source_id) ? `${e.note.split(':')[0]}: ${PRIVATE_MASK}` : e.note;
   const byDate = new Map<string, HistoryEvent[]>();
   const push = (date: string, e: HistoryEvent) => byDate.set(date, [...(byDate.get(date) ?? []), e]);
-  for (const e of xpEvents) push(e.date, { at: e.at, kind: 'xp', amount: e.amount, categoryId: e.category_id, source: e.source, note: e.note });
+  for (const e of xpEvents) {
+    const hidden = maskNote(e) !== e.note;
+    push(e.date, { at: e.at, kind: 'xp', amount: e.amount, categoryId: hidden ? null : e.category_id, source: e.source, note: maskNote(e) });
+  }
   for (const p of purchases) push(p.date, { at: p.at, kind: 'purchase', amount: p.amount, currency: p.currency, categoryId: null, source: 'store', note: p.note });
   const history = [...byDate.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
@@ -82,8 +90,10 @@ export function archiveState(ctx: Ctx, historyBefore?: string) {
     const status = new Map(mine.map((l) => [l.date, l.status]));
     const done = mine.filter((l) => l.status === 'done').length;
     const todayDone = status.get(today) === 'done';
+    const masked = !!h.private && !ctx.reveal;
     return {
-      id: h.id, title: h.title, categoryId: h.category_id, difficulty: h.difficulty, days: h.days,
+      id: h.id, title: masked ? PRIVATE_MASK : h.title, categoryId: masked ? null : h.category_id, difficulty: h.difficulty, days: h.days,
+      private: !!h.private, masked,
       current: habitStreakBefore(db, h, today) + (todayDone ? 1 : 0),
       best: habitBestStreak(h, mine),
       done, failed: mine.length - done,

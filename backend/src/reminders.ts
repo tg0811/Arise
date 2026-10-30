@@ -150,7 +150,9 @@ export function dueReminders(ctx: Ctx): PushMessage[] {
       if (!h.deadline_time) continue;
       const left = minuteOfDay(h.deadline_time) - nowMin;
       if (left > 0 && left <= prefs.nudgeMinutes && once(db, `habit:${h.id}:${today}`, at)) {
-        out.push({ title: `⏳ ${h.title}`, body: `Due by ${h.deadline_time}: ${left} min left.`, tag: `habit-${h.id}`, url: '/' });
+        // Notifications show on the lock screen: never name a private habit there.
+        const name = h.private ? '🔒 Private habit' : `⏳ ${h.title}`;
+        out.push({ title: name, body: `Due by ${h.deadline_time}: ${left} min left.`, tag: `habit-${h.id}`, url: '/' });
       }
     }
     // Quest deadline nudges

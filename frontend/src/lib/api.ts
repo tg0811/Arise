@@ -6,6 +6,8 @@ export interface Category { id: number; name: string; color: string; icon: strin
 export interface Habit {
   id: number; title: string; description: string; categoryId: number | null; difficulty: Difficulty;
   days: string; deadlineTime: string | null; scheduledToday: boolean;
+  /** Private habit; `masked` while this device hasn't unlocked (title/description/category hidden). */
+  private: boolean; masked: boolean;
   log: { status: 'done' | 'failed'; xp: number } | null;
   streak: number; multiplier: number; xpGain: number; xpLoss: number;
 }
@@ -30,6 +32,8 @@ export interface AppState {
   habits: Habit[];
   quests: Quest[];
   weeklyBossAvailable: boolean;
+  /** When this device's private-habit unlock expires (null = locked). */
+  privateUntil: string | null;
   goals: Goal[];
   storeItems: StoreItem[];
   inventory: {
@@ -54,7 +58,7 @@ export interface DayStat { date: string; total: number; done: number; gained: nu
 export interface HistoryEvent { at: string; kind: 'xp' | 'purchase'; amount: number; currency?: 'credits' | 'gems'; categoryId: number | null; source: string; note: string }
 export interface HabitStreak {
   id: number; title: string; categoryId: number | null; difficulty: Difficulty; days: string;
-  current: number; best: number; done: number; failed: number; rate: number | null;
+  current: number; best: number; done: number; failed: number; rate: number | null; private: boolean; masked: boolean;
   strip: ('done' | 'failed' | 'rest' | 'pending' | 'none')[];
 }
 export interface Archive {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Undo2, Flame, Clock, Pencil, Skull, Crown, Link2, Trash2 } from 'lucide-react';
+import { Check, X, Undo2, Flame, Clock, Pencil, Skull, Crown, Link2, Trash2, Lock, LockOpen } from 'lucide-react';
+import { UnlockSheet } from './Private';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AppState, Habit, Quest } from '../lib/api';
 import { useAction } from '../lib/api';
@@ -55,6 +56,7 @@ function isLate(deadline: string | null) {
 export function HabitCard({ s, h, onEdit }: { s: AppState; h: Habit; onEdit: () => void }) {
   const run = useTaskAction();
   const [confirmFail, setConfirmFail] = useState(false);
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const resolved = h.log !== null;
   const late = !resolved && isLate(h.deadlineTime);
   return (
@@ -71,7 +73,16 @@ export function HabitCard({ s, h, onEdit }: { s: AppState; h: Habit; onEdit: () 
             )}
             {h.multiplier > 1 && !resolved && <span className="text-[11px] font-black text-accent2">×{h.multiplier}</span>}
           </div>
-          <h3 className={`mt-1.5 font-bold leading-snug ${h.log?.status === 'done' ? 'line-through decoration-good/60' : ''}`}>{h.title}</h3>
+          {h.masked ? (
+            // Looks like any other habit; tapping the name asks for the password.
+            <button onClick={() => setUnlockOpen(true)} className={`mt-1.5 flex items-center gap-2 text-left font-bold leading-snug ${h.log?.status === 'done' ? 'line-through decoration-good/60' : ''}`}>
+              <Lock size={14} className="shrink-0 text-muted" /> <span className="tracking-widest text-ink2">{h.title}</span>
+            </button>
+          ) : (
+            <h3 className={`mt-1.5 flex items-center gap-2 font-bold leading-snug ${h.log?.status === 'done' ? 'line-through decoration-good/60' : ''}`}>
+              {h.private && <LockOpen size={14} className="shrink-0 text-accent" aria-label="Private habit" />}{h.title}
+            </h3>
+          )}
           {h.description && <p className="mt-0.5 text-sm text-ink2">{h.description}</p>}
           <div className="mt-2 flex items-center gap-3 text-xs">
             {h.deadlineTime && (
@@ -86,8 +97,9 @@ export function HabitCard({ s, h, onEdit }: { s: AppState; h: Habit; onEdit: () 
             )}
           </div>
         </div>
-        <button onClick={onEdit} className="rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-ink" aria-label="Edit"><Pencil size={15} /></button>
+        <button onClick={h.masked ? () => setUnlockOpen(true) : onEdit} className="rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-ink" aria-label="Edit"><Pencil size={15} /></button>
       </div>
+      <UnlockSheet open={unlockOpen} onClose={() => setUnlockOpen(false)} />
 
       <div className="mt-3 flex gap-2">
         {resolved ? (

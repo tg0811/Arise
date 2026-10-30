@@ -3,7 +3,10 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { DB } from './db.ts';
 import { tx } from './db.ts';
-import { COOKIE, checkPassword, createSession, deleteSession, isConfigured, isValidSession, setPassword } from './auth.ts';
+import {
+  COOKIE, PRIVATE_UNLOCK_MINUTES, checkPassword, createSession, deleteSession, isConfigured, isValidSession,
+  privateUnlockedUntil, setPassword, setPrivateUnlock,
+} from './auth.ts';
 import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
   getProfile, getTask, logWeight, settle, undoHabit, undoQuest, type Ctx,
@@ -51,6 +54,7 @@ const HabitBody = z.object({
   difficulty,
   days: z.string().regex(/^[0-6]{1,7}$/).default('0123456'),
   deadlineTime: hhmm.nullable().default(null),
+  private: z.boolean().default(false),
 });
 
 const QuestBody = z.object({
@@ -121,9 +125,14 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   const send = () => sender ?? webPushSender(db);
   const app = new Hono();
   const secure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : process.env.NODE_ENV === 'production';
-  const ctx = (): Ctx => ({ db, at: clock(), rng });
-  const state = () => {
-    const c = ctx();
+  // Each request's context knows whether its session has unlocked private habits.
+  const ctx = (c?: any): Ctx => {
+    const at = clock();
+    const privateUntil = c ? privateUnlockedUntil(db, getCookie(c, COOKIE), at) : null;
+    return { db, at, rng, reveal: !!privateUntil, privateUntil };
+  };
+  const state = (req?: any) => {
+    const c = ctx(req);
     settle(c);
     return fullState(c);
   };
@@ -176,7 +185,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   });
 
   // ------------------------------------------------------------ state & profile
-  app.get('/api/state', (c) => c.json(state()));
+  app.get('/api/state', (c) => c.json(state(c)));
 
   app.put('/api/profile', async (c) => {
     const b = ProfileBody.parse(await c.req.json());
@@ -191,10 +200,10 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
         b.heightCm !== undefined ? b.heightCm : cur.height_cm,
       );
       // Logged after the timezone update so the weigh-in lands on the right local day.
-      if (b.weightKg !== undefined) logWeight(ctx(), Math.round(b.weightKg * 10) / 10);
-      if (b.equippedTitle !== undefined) equipTitle(ctx(), b.equippedTitle);
+      if (b.weightKg !== undefined) logWeight(ctx(c), Math.round(b.weightKg * 10) / 10);
+      if (b.equippedTitle !== undefined) equipTitle(ctx(c), b.equippedTitle);
     });
-    return c.json(state());
+    return c.json(state(c));
   });
 
   // ------------------------------------------------------------ categories
@@ -202,13 +211,13 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const b = CategoryBody.parse(await c.req.json());
     const { m } = db.prepare('SELECT COALESCE(MAX(sort), -1) AS m FROM categories').get() as { m: number };
     db.prepare('INSERT INTO categories (name, color, icon, sort) VALUES (?, ?, ?, ?)').run(b.name, b.color, b.icon, m + 1);
-    return c.json(state());
+    return c.json(state(c));
   });
 
   app.put('/api/categories/:id', async (c) => {
     const b = CategoryBody.parse(await c.req.json());
     db.prepare('UPDATE categories SET name = ?, color = ?, icon = ? WHERE id = ?').run(b.name, b.color, b.icon, id(c.req.param('id')));
-    return c.json(state());
+    return c.json(state(c));
   });
 
   app.delete('/api/categories/:id', (c) => {
@@ -217,45 +226,48 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const used = db.prepare('SELECT 1 FROM tasks WHERE category_id = ? UNION SELECT 1 FROM xp_events WHERE category_id = ? LIMIT 1').get(cid, cid);
     if (used) db.prepare('UPDATE categories SET archived = 1 WHERE id = ?').run(cid);
     else db.prepare('DELETE FROM categories WHERE id = ?').run(cid);
-    return c.json(state());
+    return c.json(state(c));
   });
 
   // ------------------------------------------------------------ habits
   app.post('/api/habits', async (c) => {
     const b = HabitBody.parse(await c.req.json());
     const at = clock();
-    db.prepare(`INSERT INTO tasks (kind, title, description, category_id, difficulty, days, deadline_time, created_at, created_date)
-      VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(b.title, b.description, b.categoryId, b.difficulty, b.days, b.deadlineTime, at.toISOString(), localDate(getProfile(db).timezone, at));
-    return c.json(state());
+    db.prepare(`INSERT INTO tasks (kind, title, description, category_id, difficulty, days, deadline_time, private, created_at, created_date)
+      VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(b.title, b.description, b.categoryId, b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), localDate(getProfile(db).timezone, at));
+    return c.json(state(c));
   });
 
   app.put('/api/habits/:id', async (c) => {
     const b = HabitBody.parse(await c.req.json());
     const h = getTask(db, id(c.req.param('id')));
     if (h.kind !== 'habit') throw new HttpError(404, 'Habit not found');
-    db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, difficulty = ?, days = ?, deadline_time = ? WHERE id = ?')
-      .run(b.title, b.description, b.categoryId, b.difficulty, b.days, b.deadlineTime, h.id);
-    return c.json(state());
+    // A locked private habit can't be edited: the form would only have the mask to save back.
+    if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private habits first');
+    db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, difficulty = ?, days = ?, deadline_time = ?, private = ? WHERE id = ?')
+      .run(b.title, b.description, b.categoryId, b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, h.id);
+    return c.json(state(c));
   });
 
   app.delete('/api/habits/:id', (c) => {
     const h = getTask(db, id(c.req.param('id')));
     if (h.kind !== 'habit') throw new HttpError(404, 'Habit not found');
+    if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private habits first');
     // Archive so past logs (and the XP they moved) stay in history.
     db.prepare('UPDATE tasks SET archived = 1 WHERE id = ?').run(h.id);
-    return c.json(state());
+    return c.json(state(c));
   });
 
   app.post('/api/habits/reorder', async (c) => {
     const { ids } = z.object({ ids: z.array(z.number().int()) }).parse(await c.req.json());
     tx(db, () => ids.forEach((tid, i) => db.prepare("UPDATE tasks SET sort = ? WHERE id = ? AND kind = 'habit'").run(i, tid)));
-    return c.json(state());
+    return c.json(state(c));
   });
 
   for (const [action, fn] of [['complete', completeHabit], ['fail', failHabit], ['undo', undoHabit]] as const) {
     app.post(`/api/habits/:id/${action}`, (c) => {
-      const cx = ctx();
+      const cx = ctx(c);
       settle(cx);
       fn(cx, id(c.req.param('id')));
       return c.json(fullState(cx));
@@ -265,7 +277,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   // ------------------------------------------------------------ quests
   app.post('/api/quests', async (c) => {
     const b = QuestBody.parse(await c.req.json());
-    const cx = ctx();
+    const cx = ctx(c);
     settle(cx);
     createQuest(cx, b as Parameters<typeof createQuest>[1]);
     return c.json(fullState(cx));
@@ -278,11 +290,11 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     if (new Date(b.deadlineAt) <= clock()) throw new HttpError(400, 'Deadline must be in the future');
     db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, deadline_at = ? WHERE id = ?')
       .run(b.title, b.description, b.categoryId, b.deadlineAt, q.id);
-    return c.json(state());
+    return c.json(state(c));
   });
 
   app.delete('/api/quests/:id', (c) => {
-    const cx = ctx();
+    const cx = ctx(c);
     deleteQuest(cx, id(c.req.param('id')));
     settle(cx);
     return c.json(fullState(cx));
@@ -290,7 +302,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
 
   for (const [action, fn] of [['complete', completeQuest], ['fail', failQuest], ['undo', undoQuest]] as const) {
     app.post(`/api/quests/:id/${action}`, (c) => {
-      const cx = ctx();
+      const cx = ctx(c);
       settle(cx);
       fn(cx, id(c.req.param('id')));
       return c.json(fullState(cx));
@@ -299,8 +311,8 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
 
   // ------------------------------------------------------------ phase 2
   // Every mutation settles first (deadlines may have passed) and returns the fresh state.
-  const mutate = (fn: (cx: Ctx) => unknown) => {
-    const cx = ctx();
+  const mutate = (req: any, fn: (cx: Ctx) => unknown) => {
+    const cx = ctx(req);
     settle(cx);
     fn(cx);
     return fullState(cx);
@@ -308,70 +320,86 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
 
   app.post('/api/goals', async (c) => {
     const b = GoalBody.parse(await c.req.json());
-    return c.json(mutate((cx) => createGoal(cx, b as Parameters<typeof createGoal>[1])));
+    return c.json(mutate(c, (cx) => createGoal(cx, b as Parameters<typeof createGoal>[1])));
   });
   app.put('/api/goals/:id', async (c) => {
     const b = GoalBody.parse(await c.req.json());
-    return c.json(mutate((cx) => updateGoal(cx, id(c.req.param('id')), b as Parameters<typeof updateGoal>[2])));
+    return c.json(mutate(c, (cx) => updateGoal(cx, id(c.req.param('id')), b as Parameters<typeof updateGoal>[2])));
   });
-  app.delete('/api/goals/:id', (c) => c.json(mutate((cx) => deleteGoal(cx, id(c.req.param('id'))))));
-  app.post('/api/goals/:id/complete', (c) => c.json(mutate((cx) => completeGoal(cx, id(c.req.param('id'))))));
-  app.post('/api/goals/:id/undo', (c) => c.json(mutate((cx) => undoGoal(cx, id(c.req.param('id'))))));
+  app.delete('/api/goals/:id', (c) => c.json(mutate(c, (cx) => deleteGoal(cx, id(c.req.param('id'))))));
+  app.post('/api/goals/:id/complete', (c) => c.json(mutate(c, (cx) => completeGoal(cx, id(c.req.param('id'))))));
+  app.post('/api/goals/:id/undo', (c) => c.json(mutate(c, (cx) => undoGoal(cx, id(c.req.param('id'))))));
 
   app.post('/api/store', async (c) => {
     const b = StoreItemBody.parse(await c.req.json());
-    return c.json(mutate((cx) => createItem(cx, b)));
+    return c.json(mutate(c, (cx) => createItem(cx, b)));
   });
   app.put('/api/store/:id', async (c) => {
     const b = StoreItemBody.parse(await c.req.json());
-    return c.json(mutate((cx) => updateItem(cx, id(c.req.param('id')), b)));
+    return c.json(mutate(c, (cx) => updateItem(cx, id(c.req.param('id')), b)));
   });
-  app.delete('/api/store/:id', (c) => c.json(mutate((cx) => deleteItem(cx, id(c.req.param('id'))))));
-  app.post('/api/store/:id/buy', (c) => c.json(mutate((cx) => buyItem(cx, id(c.req.param('id'))))));
-  app.post('/api/inventory/:itemId/use', (c) => c.json(mutate((cx) => useItem(cx, id(c.req.param('itemId'))))));
+  app.delete('/api/store/:id', (c) => c.json(mutate(c, (cx) => deleteItem(cx, id(c.req.param('id'))))));
+  app.post('/api/store/:id/buy', (c) => c.json(mutate(c, (cx) => buyItem(cx, id(c.req.param('id'))))));
+  app.post('/api/inventory/:itemId/use', (c) => c.json(mutate(c, (cx) => useItem(cx, id(c.req.param('itemId'))))));
 
   app.post('/api/lootbox/open', (c) => {
     let loot: ReturnType<typeof openLootbox> | undefined;
-    const state = mutate((cx) => { loot = openLootbox(cx); });
+    const state = mutate(c, (cx) => { loot = openLootbox(cx); });
     return c.json({ ...state, loot });
   });
 
   app.post('/api/journal', async (c) => {
     const b = JournalBody.parse(await c.req.json());
-    return c.json(mutate((cx) => createEntry(cx, b)));
+    return c.json(mutate(c, (cx) => createEntry(cx, b)));
   });
   app.put('/api/journal/:id', async (c) => {
     const b = JournalEditBody.parse(await c.req.json());
-    return c.json(mutate((cx) => updateEntry(cx, id(c.req.param('id')), b)));
+    return c.json(mutate(c, (cx) => updateEntry(cx, id(c.req.param('id')), b)));
   });
-  app.delete('/api/journal/:id', (c) => c.json(mutate((cx) => deleteEntry(cx, id(c.req.param('id'))))));
+  app.delete('/api/journal/:id', (c) => c.json(mutate(c, (cx) => deleteEntry(cx, id(c.req.param('id'))))));
+
+  // ------------------------------------------------------------ private habits
+  // Unlock is per login session (this device) and expires on its own.
+  app.post('/api/private/unlock', async (c) => {
+    const { password } = z.object({ password: z.string().max(200) }).parse(await c.req.json());
+    if (!checkPassword(db, password)) {
+      await new Promise((r) => setTimeout(r, 600));
+      throw new HttpError(401, 'Wrong password');
+    }
+    setPrivateUnlock(db, getCookie(c, COOKIE)!, new Date(clock().getTime() + PRIVATE_UNLOCK_MINUTES * 60_000));
+    return c.json(state(c));
+  });
+  app.post('/api/private/lock', (c) => {
+    setPrivateUnlock(db, getCookie(c, COOKIE)!, null);
+    return c.json(state(c));
+  });
 
   // ------------------------------------------------------------ phase 4: focus
   app.post('/api/focus/start', async (c) => {
     const b = z.object({ title: z.string().trim().min(1).max(80), categoryId: z.number().int().nullable(), minutes: z.number().int().min(5).max(FOCUS_MAX_MIN) })
       .parse(await c.req.json());
-    return c.json(mutate((cx) => startFocus(cx, b)));
+    return c.json(mutate(c, (cx) => startFocus(cx, b)));
   });
-  app.post('/api/focus/complete', (c) => c.json(mutate((cx) => completeFocus(cx))));
-  app.post('/api/focus/abandon', (c) => c.json(mutate((cx) => abandonFocus(cx))));
+  app.post('/api/focus/complete', (c) => c.json(mutate(c, (cx) => completeFocus(cx))));
+  app.post('/api/focus/abandon', (c) => c.json(mutate(c, (cx) => abandonFocus(cx))));
 
   // ------------------------------------------------------------ phase 4: push reminders
   app.get('/api/push/key', (c) => c.json({ publicKey: vapidKeys(db).publicKey }));
   app.post('/api/push/subscribe', async (c) => {
     const sub = PushSubBody.parse(await c.req.json());
-    return c.json(mutate((cx) => subscribe(cx, sub as any)));
+    return c.json(mutate(c, (cx) => subscribe(cx, sub as any)));
   });
   app.post('/api/push/unsubscribe', async (c) => {
     const { endpoint } = z.object({ endpoint: z.string() }).parse(await c.req.json());
-    return c.json(mutate((cx) => unsubscribe(cx, endpoint)));
+    return c.json(mutate(c, (cx) => unsubscribe(cx, endpoint)));
   });
   app.post('/api/push/test', async (c) => {
-    await sendTest(ctx(), send());
+    await sendTest(ctx(c), send());
     return c.json({ ok: true });
   });
   app.put('/api/reminders', async (c) => {
     const b = ReminderBody.parse(await c.req.json());
-    return c.json(mutate(() => setPrefs(db, b)));
+    return c.json(mutate(c, () => setPrefs(db, b)));
   });
 
   // ------------------------------------------------------------ phase 4: data
@@ -382,19 +410,19 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   });
   app.post('/api/restore', async (c) => {
     restoreData(db, await c.req.json());
-    return c.json(state());
+    return c.json(state(c));
   });
   app.post('/api/reset', async (c) => {
     const { phrase } = z.object({ phrase: z.string() }).parse(await c.req.json());
     resetData(db, phrase);
-    return c.json(state());
+    return c.json(state(c));
   });
 
   // ------------------------------------------------------------ phase 3
   app.get('/api/archive', (c) => {
     const before = c.req.query('before');
     if (before !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(before)) throw new HttpError(400, 'before must be YYYY-MM-DD');
-    const cx = ctx();
+    const cx = ctx(c);
     settle(cx);
     return c.json(archiveState(cx, before));
   });

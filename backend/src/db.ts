@@ -213,6 +213,11 @@ const MIGRATIONS: string[] = [
     xp INTEGER NOT NULL DEFAULT 0
   );
   `,
+  `
+  -- Private habits: hidden until unlocked with the password, per login session, for a few minutes.
+  ALTER TABLE tasks ADD COLUMN private INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sessions ADD COLUMN private_until TEXT;
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

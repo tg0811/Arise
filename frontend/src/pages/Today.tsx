@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Moon, Target, ChevronRight, Timer } from 'lucide-react';
 import { FocusForm } from '../components/Focus';
+import { PrivateUnlockedBar } from '../components/Private';
 import { LootboxButton } from '../components/Lootbox';
 import { Countdown } from '../components/Countdown';
 import { DAY_CLEAR_RATIO } from '@shared';
@@ -69,6 +70,7 @@ export function Today({ s }: { s: AppState }) {
       )}
 
       <SectionTitle right={<span className="text-xs font-bold text-muted">{todayHabits.filter((h) => h.log).length}/{todayHabits.length}</span>}>Daily Habits</SectionTitle>
+      <PrivateUnlockedBar s={s} />
       {sortedHabits.length === 0 ? (
         <EmptyHint text="No habits today. Add the disciplines you want to hold yourself to." onAdd={() => setEditing({ kind: 'new' })} />
       ) : (

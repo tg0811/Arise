@@ -48,3 +48,18 @@ export function isValidSession(db: DB, token: string | undefined): boolean {
 export function deleteSession(db: DB, token: string) {
   db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }
+
+// ---------------------------------------------------------------- private habits
+
+export const PRIVATE_UNLOCK_MINUTES = 5;
+
+/** Is this session currently allowed to see private habits? */
+export function privateUnlockedUntil(db: DB, token: string | undefined, now: Date): string | null {
+  if (!token) return null;
+  const row = db.prepare('SELECT private_until FROM sessions WHERE token = ?').get(token) as { private_until: string | null } | undefined;
+  return row?.private_until && row.private_until > now.toISOString() ? row.private_until : null;
+}
+
+export function setPrivateUnlock(db: DB, token: string, until: Date | null) {
+  db.prepare('UPDATE sessions SET private_until = ? WHERE token = ?').run(until ? until.toISOString() : null, token);
+}

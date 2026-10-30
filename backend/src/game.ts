@@ -22,7 +22,14 @@ export interface Ctx {
   at: Date;
   /** Randomness source in [0, 1); injectable so tests can pin lootbox rolls. */
   rng?: () => number;
+  /** Private habits are shown in full only when this is set (session unlocked with the password). */
+  reveal?: boolean;
+  /** When this session's private unlock expires (ISO), if unlocked. */
+  privateUntil?: string | null;
 }
+
+/** What a locked private habit shows instead of its name (fixed length: no hint of the real one). */
+export const PRIVATE_MASK = '• • • • • • • •';
 
 export interface Profile {
   name: string;
@@ -66,6 +73,7 @@ export interface Task {
   sort: number;
   created_at: string;
   created_date: string;
+  private: number;
 }
 
 interface HabitLog {
@@ -452,8 +460,10 @@ export function buildState(ctx: Ctx) {
     const before = habitStreakBefore(db, h, todayStr);
     const streak = log?.status === 'done' ? before + 1 : before;
     const nextMultiplier = streakMultiplier(before + 1);
+    const masked = !!h.private && !ctx.reveal;
     return {
-      id: h.id, title: h.title, description: h.description, categoryId: h.category_id, difficulty: h.difficulty,
+      id: h.id, title: masked ? PRIVATE_MASK : h.title, description: masked ? '' : h.description,
+      categoryId: masked ? null : h.category_id, difficulty: h.difficulty, private: !!h.private, masked,
       days: h.days, deadlineTime: h.deadline_time, scheduledToday: isScheduled(h.days, todayStr),
       log: log ? { status: log.status, xp: log.xp } : null,
       streak, multiplier: nextMultiplier,
@@ -502,6 +512,7 @@ export function buildState(ctx: Ctx) {
     habits,
     quests,
     weeklyBossAvailable: weeklyBossAvailable(ctx),
+    privateUntil: ctx.privateUntil ?? null,
   };
 }
 

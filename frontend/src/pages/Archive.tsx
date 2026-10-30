@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { CheckCircle2, Swords, Flame, Skull, Trophy, Coins, Gem, ShoppingBag, Sparkles, XCircle, ScrollText, Gift, Loader2 } from 'lucide-react';
+import { CheckCircle2, Swords, Flame, Skull, Trophy, Coins, Gem, ShoppingBag, Sparkles, XCircle, ScrollText, Gift, Loader2, Lock, LockOpen } from 'lucide-react';
 import { useArchive, type AppState, type Archive as ArchiveData, type DayStat, type HabitStreak, type HistoryEvent } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
 import { formatDate } from '../lib/time';
@@ -161,7 +161,9 @@ function Streaks({ s, habits }: { s: AppState; habits: HabitStreak[] }) {
                   {cat && <span className="inline-flex items-center gap-1" style={{ color: cat.color }}><CategoryIcon name={cat.icon} size={11} /> {cat.name}</span>}
                   <span style={{ color: DIFFICULTY_STYLE[h.difficulty].color }}>{DIFFICULTY_STYLE[h.difficulty].label}</span>
                 </div>
-                <h3 className="mt-1 truncate font-bold">{h.title}</h3>
+                <h3 className={`mt-1 flex items-center gap-1.5 truncate font-bold ${h.masked ? 'tracking-widest text-ink2' : ''}`}>
+                  {h.private && (h.masked ? <Lock size={13} className="shrink-0 text-muted" /> : <LockOpen size={13} className="shrink-0 text-accent" />)}{h.title}
+                </h3>
               </div>
               <div className="flex shrink-0 gap-4 text-center">
                 <div><div className="flex items-center gap-1 text-lg font-bold"><Flame size={15} className="text-gold" />{h.current}</div><div className="text-[10px] text-muted">current</div></div>
