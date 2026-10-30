@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Camera, Plus, Pencil, LogOut } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Camera, Plus, Pencil, LogOut, ScrollText, ChevronRight } from 'lucide-react';
 import { api, useAction, type AppState, type Category } from '../lib/api';
 import { Avatar, resizeImage } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
@@ -27,6 +28,15 @@ export function Settings({ s }: { s: AppState }) {
 
   return (
     <div className="pt-2">
+      <Link to="/settings/rules" className="glass mt-3 flex items-center gap-3 rounded-2xl p-4 transition hover:border-accent">
+        <span className="rounded-xl bg-accent/15 p-2.5 text-accent"><ScrollText size={20} /></span>
+        <span className="flex-1">
+          <span className="block font-display font-bold tracking-wider">Rules of the System</span>
+          <span className="block text-xs text-ink2">XP, failing, streaks, levels, ranks: every rule in one place</span>
+        </span>
+        <ChevronRight size={18} className="text-muted" />
+      </Link>
+
       <SectionTitle>Profile</SectionTitle>
       <Panel className="p-5">
         <div className="flex items-center gap-4">

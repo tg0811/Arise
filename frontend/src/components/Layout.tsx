@@ -17,7 +17,7 @@ export function Layout({ s }: { s: AppState }) {
       <nav className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-1 px-3 py-6 md:flex">
         <div className="mb-6 px-3 font-display text-xl font-black tracking-[0.3em] text-accent">ARISE</div>
         {NAV.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} end
+          <NavLink key={to} to={to} end={to === "/"}
             className={({ isActive }) => `relative flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.12em] transition ${isActive ? 'glass text-ink' : 'text-muted hover:text-ink'}`}>
             {({ isActive }) => (
               <>
@@ -37,7 +37,7 @@ export function Layout({ s }: { s: AppState }) {
       {/* Mobile bottom bar */}
       <nav className="glass-solid safe-bottom fixed inset-x-0 bottom-0 z-40 flex rounded-t-2xl border-b-0 md:hidden">
         {NAV.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} end
+          <NavLink key={to} to={to} end={to === "/"}
             className={({ isActive }) => `flex flex-1 flex-col items-center gap-0.5 py-2.5 transition ${isActive ? 'text-accent' : 'text-muted'}`}>
             {({ isActive }) => (
               <>

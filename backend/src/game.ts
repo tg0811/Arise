@@ -2,9 +2,9 @@ import { randomBytes } from 'node:crypto';
 import type { DB } from './db.ts';
 import { getSetting, setSetting, tx } from './db.ts';
 import {
-  BOSS_MULTIPLIER, DAY_CLEAR_RATIO, DIFFICULTY_XP, MAX_LEVEL, WEEKLY_BOSS_SHARE,
+  BOSS_MULTIPLIER, DAY_CLEAR_RATIO, DIFFICULTY_XP, MAX_LEVEL,
   addDays, attributeLevel, creditsFor, isScheduled, levelFromXp, localDate, moodFor,
-  nextRank, rankForLevel, streakMultiplier, weekStart,
+  nextRank, rankForLevel, streakMultiplier, weekStart, weeklyBossXp,
   type Difficulty,
 } from '../../shared/engine.ts';
 
@@ -205,7 +205,7 @@ export function createQuest(ctx: Ctx, q: NewQuest): number {
     if (q.boss === 'weekly') {
       if (!weeklyBossAvailable(ctx)) throw new HttpError(409, 'This week already has a Mega Boss');
       // Frozen at creation so later level changes don't move the goalposts.
-      xpValue = Math.max(50, Math.round((levelFromXp(totalXp(ctx.db)).need * WEEKLY_BOSS_SHARE) / 10) * 10);
+      xpValue = weeklyBossXp(levelFromXp(totalXp(ctx.db)).need);
     }
     const date = today(ctx);
     const chainId = q.parts.length ? randomBytes(6).toString('hex') : null;

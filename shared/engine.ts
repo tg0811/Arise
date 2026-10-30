@@ -27,6 +27,9 @@ export const BOSS_MULTIPLIER = 3;
 /** Weekly mega boss is worth this share of the XP needed for the next level. */
 export const WEEKLY_BOSS_SHARE = 0.25;
 
+/** Weekly mega boss value given the XP still needed for the next level (min 50, rounded to 10). */
+export const weeklyBossXp = (levelNeed: number) => Math.max(50, Math.round((levelNeed * WEEKLY_BOSS_SHARE) / 10) * 10);
+
 /** A day counts toward the global streak when this share of its tasks is done. */
 export const DAY_CLEAR_RATIO = 0.8;
 
@@ -34,10 +37,15 @@ export const DAY_CLEAR_RATIO = 0.8;
 
 const round10 = (n: number) => Math.round(n / 10) * 10;
 
+/** XP to next level = round10(CURVE_BASE + CURVE_FACTOR · level^CURVE_POWER). */
+export const CURVE_BASE = 100;
+export const CURVE_FACTOR = 8;
+export const CURVE_POWER = 1.5;
+
 /** XP required to go from `level` to `level + 1`. */
 export function xpToNext(level: number): number {
   if (level >= MAX_LEVEL) return 0;
-  return round10(100 + 8 * Math.pow(level, 1.5));
+  return round10(CURVE_BASE + CURVE_FACTOR * Math.pow(level, CURVE_POWER));
 }
 
 const CUMULATIVE: number[] = (() => {
@@ -112,23 +120,31 @@ export function streakMultiplier(days: number): number {
 
 // ---------------------------------------------------------------- attributes
 
+/** Attribute level L starts at ATTR_SCALE·(L−1)² XP. */
+export const ATTR_SCALE = 25;
+
 /** Attribute (per-category) level from that category's net XP. */
 export function attributeLevel(xp: number): LevelInfo {
   const safe = Math.max(0, xp);
-  const level = Math.floor(Math.sqrt(safe / 25)) + 1;
-  const floor = 25 * (level - 1) ** 2;
-  const ceil = 25 * level ** 2;
+  const level = Math.floor(Math.sqrt(safe / ATTR_SCALE)) + 1;
+  const floor = ATTR_SCALE * (level - 1) ** 2;
+  const ceil = ATTR_SCALE * level ** 2;
   return { level, into: safe - floor, need: ceil - floor, pct: (safe - floor) / (ceil - floor) };
 }
 
 // ---------------------------------------------------------------- mood
 
+/** Mood from the last 7 days' completion rate; first tier whose `min` is met wins. */
+export const MOOD_TIERS: { mood: Mood; min: number }[] = [
+  { mood: 'radiant', min: 0.9 },
+  { mood: 'steady', min: 0.6 },
+  { mood: 'worn', min: 0.3 },
+  { mood: 'broken', min: 0 },
+];
+
 export function moodFor(rate: number | null): Mood {
   if (rate === null) return 'steady';
-  if (rate >= 0.9) return 'radiant';
-  if (rate >= 0.6) return 'steady';
-  if (rate >= 0.3) return 'worn';
-  return 'broken';
+  return MOOD_TIERS.find((t) => rate >= t.min)!.mood;
 }
 
 // ---------------------------------------------------------------- dates
