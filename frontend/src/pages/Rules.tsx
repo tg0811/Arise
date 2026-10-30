@@ -5,6 +5,7 @@ import {
   ATTR_SCALE, BOSS_MULTIPLIER, CURVE_BASE, CURVE_FACTOR, CURVE_POWER, DAY_CLEAR_RATIO, DIFFICULTIES, DIFFICULTY_XP,
   MAX_LEVEL, MOOD_TIERS, RANKS, STREAK_TIERS, WEEKLY_BOSS_SHARE, attributeLevel, creditsFor, rankForLevel,
   totalXpForLevel, weeklyBossXp, xpToNext,
+  GOAL_LATE_SHARE, GOAL_SIZES, JOURNAL_AAR_XP, LOOT_GEM_STREAK_STEP, LOOT_ODDS, LOOT_STREAK_BONUS_CAP, LOOT_STREAK_BONUS_PER_DAY, lootStreakBonus,
 } from '@shared';
 import type { AppState } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
@@ -43,8 +44,6 @@ const Rule = ({ children }: { children: ReactNode }) => (
   </li>
 );
 
-const Soon = () => <span className="ml-1 rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted">coming</span>;
-
 export function Rules({ s }: { s: AppState }) {
   const level = s.progress.level;
   const levelRow = SAMPLE_LEVELS.indexOf(level);
@@ -82,7 +81,7 @@ export function Rules({ s }: { s: AppState }) {
       </Panel>
       <ul className="mt-3 space-y-2 px-1">
         <Rule>What you can gain, you can lose. A task's fail costs exactly its base XP.</Rule>
-        <Rule>Credits are earned on completion only (XP ÷ 5) and are never taken away. They'll be spent in the Store.<Soon /></Rule>
+        <Rule>Credits are earned on completion only (XP ÷ 5) and are never taken away. Spend them in the Store.</Rule>
       </ul>
 
       <SectionTitle>3 · Failing &amp; deadlines</SectionTitle>
@@ -111,7 +110,7 @@ export function Rules({ s }: { s: AppState }) {
           <Rule>The multiplier boosts only what you <i>gain</i>. A fail always costs the base amount, and it resets that habit's streak to 0.</Rule>
           <Rule><b className="text-ink">🔥 Daily streak:</b> consecutive days where you completed at least <b className="text-ink">{clear}</b> of that day's tasks (habits and quests due that day).</Rule>
           <Rule>Days with no tasks at all are neutral: they don't break the streak.</Rule>
-          <Rule>Clearing {clear} also unlocks the <b className="text-ink">daily lootbox</b>, and a longer streak makes it richer.<Soon /></Rule>
+          <Rule>Clearing {clear} also unlocks the <b className="text-ink">daily payload</b> (see 6), and a longer streak makes it richer.</Rule>
         </ul>
       </Panel>
 
@@ -127,7 +126,39 @@ export function Rules({ s }: { s: AppState }) {
         </ul>
       </Panel>
 
-      <SectionTitle>6 · Levels</SectionTitle>
+      <SectionTitle>6 · Major goals</SectionTitle>
+      <Panel className="p-4">
+        <ul className="mb-3 space-y-2">
+          <Rule>Long-horizon targets: <b className="text-ink">Siege</b> (exam), <b className="text-ink">Forge</b> (project), <b className="text-ink">Gauntlet</b> (event). You choose the stakes.</Rule>
+          <Rule>Finish before the deadline for the full XP (plus credits). If the deadline passes, you <b className="text-bad">lose the same XP once</b>, and the goal stays on your board.</Rule>
+          <Rule>A goal finished after its deadline still earns {pct(GOAL_LATE_SHARE)} of the reward. Late is better than never.</Rule>
+          <Rule>After the deadline passes, the stakes and deadline are locked. Removing a goal never refunds a penalty already paid.</Rule>
+        </ul>
+        <Table head={['Size', 'On time', 'Missed', 'Late finish']}
+          rows={GOAL_SIZES.map((g) => [g.label, <span className="text-good">+{g.xp}</span>, <span className="text-bad">−{g.xp}</span>, `+${Math.round(g.xp * GOAL_LATE_SHARE)}`])} />
+      </Panel>
+
+      <SectionTitle>7 · Daily payload</SectionTitle>
+      <Panel className="p-4">
+        <ul className="mb-3 space-y-2">
+          <Rule>Unlocks once {clear} of today's tasks are complete. One opening per day; it doesn't carry over.</Rule>
+          <Rule>Streak bonus: +{pct(LOOT_STREAK_BONUS_PER_DAY)} per streak day on credits and XP (max +{pct(LOOT_STREAK_BONUS_CAP)}), and +1 gem per {LOOT_GEM_STREAK_STEP} streak days. Yours right now: +{pct(lootStreakBonus(s.streak.current))}.</Rule>
+          <Rule>Item drops pick a random store reward marked "can drop from the daily payload".</Rule>
+        </ul>
+        <Table head={['Drop', 'Chance', 'Amount']}
+          rows={LOOT_ODDS.map((o) => [<span className="capitalize">{o.type}</span>, pct(o.chance), o.type === 'item' ? '1 reward' : `${o.min}–${o.max}`])} />
+      </Panel>
+
+      <SectionTitle>8 · Store, inventory &amp; journal</SectionTitle>
+      <Panel className="p-4">
+        <ul className="space-y-2">
+          <Rule>The store holds <b className="text-ink">real-world rewards</b> that you price yourself. Buying moves one into your inventory; <b className="text-ink">Use</b> means you go enjoy it.</Rule>
+          <Rule>Credits come from completing tasks and goals. Gems are rare and only drop from the payload, so price your biggest treats in gems.</Rule>
+          <Rule>Writing an <b className="text-ink">after-action review</b> for a conquered or past-due goal earns +{JOURNAL_AAR_XP} Mind XP (once per goal). Free notes earn nothing; they're just for you.</Rule>
+        </ul>
+      </Panel>
+
+      <SectionTitle>9 · Levels</SectionTitle>
       <Panel className="p-4">
         <ul className="mb-3 space-y-2">
           <Rule>Max level is <b className="text-ink">{MAX_LEVEL}</b>. XP to the next level = {CURVE_BASE} + {CURVE_FACTOR} × level<sup>{CURVE_POWER}</sup>, rounded to 10. Each level costs more than the last.</Rule>
@@ -141,7 +172,7 @@ export function Rules({ s }: { s: AppState }) {
         <p className="mt-2 text-xs text-muted">You are level {level} with {s.progress.totalXp.toLocaleString()} total XP.</p>
       </Panel>
 
-      <SectionTitle>7 · Ranks</SectionTitle>
+      <SectionTitle>10 · Ranks</SectionTitle>
       <Panel brackets={false} className="p-1">
         <Table
           head={['Rank', 'Title', 'Levels']}
@@ -158,7 +189,7 @@ export function Rules({ s }: { s: AppState }) {
         <Rule>Your avatar's aura grows with rank: E dim · D halo · C ring · B orbiting mote · A spinning motes · S corona.</Rule>
       </ul>
 
-      <SectionTitle>8 · Attributes</SectionTitle>
+      <SectionTitle>11 · Attributes</SectionTitle>
       <Panel className="p-4">
         <ul className="mb-3 space-y-2">
           <Rule>Each category is an attribute. It holds the <b className="text-ink">net XP</b> of its tasks: completions raise it, fails lower it (never below 0).</Rule>
@@ -173,7 +204,7 @@ export function Rules({ s }: { s: AppState }) {
         </p>
       </Panel>
 
-      <SectionTitle>9 · Mood</SectionTitle>
+      <SectionTitle>12 · Mood</SectionTitle>
       <Panel className="p-4">
         <p className="mb-2 text-sm text-ink2">Your share of tasks completed over the last 7 days:</p>
         <Table
@@ -187,7 +218,7 @@ export function Rules({ s }: { s: AppState }) {
         <p className="mt-2 text-xs text-muted">With no history yet, you start Steady.</p>
       </Panel>
 
-      <SectionTitle>10 · The covenant</SectionTitle>
+      <SectionTitle>13 · The covenant</SectionTitle>
       <Panel className="p-4">
         <ul className="space-y-2">
           <Rule>Report honestly. The System only knows what you tell it. The only one you can cheat is yourself.</Rule>

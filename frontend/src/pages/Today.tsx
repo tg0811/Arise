@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Plus, Moon, Gift } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Moon, Target, ChevronRight } from 'lucide-react';
+import { LootboxButton } from '../components/Lootbox';
+import { Countdown } from '../components/Countdown';
 import { DAY_CLEAR_RATIO } from '@shared';
 import type { AppState, Habit, Quest } from '../lib/api';
 import { HabitCard, QuestCard } from '../components/TaskCards';
@@ -18,6 +21,7 @@ export function Today({ s }: { s: AppState }) {
   const activeQuests = s.quests.filter((q) => q.status === 'pending');
   const resolvedQuests = s.quests.filter((q) => q.status !== 'pending');
   const t = s.streak.today;
+  const activeGoals = s.goals.filter((g) => g.status === 'active');
   const date = new Date(s.today + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -28,15 +32,28 @@ export function Today({ s }: { s: AppState }) {
             <p className="label">{date}</p>
             <p className="mt-1 text-2xl font-black">{t.done}<span className="text-ink2"> / {t.total}</span> <span className="text-sm font-bold text-ink2">cleared</span></p>
           </div>
-          <div className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold ${t.cleared ? 'border-gold/40 bg-gold/10 text-gold' : 'border-line text-muted'}`}>
-            <Gift size={14} /> {t.cleared ? 'Day cleared' : `${Math.round(DAY_CLEAR_RATIO * 100)}% to clear`}
-          </div>
+          <LootboxButton s={s} />
         </div>
         <div className="relative mt-3">
           <ProgressBar pct={t.ratio} className="h-2.5" />
           <span className="absolute top-0 h-2.5 w-0.5 bg-gold" style={{ left: `${DAY_CLEAR_RATIO * 100}%` }} title="Clear line" />
         </div>
       </Panel>
+
+      {activeGoals.length > 0 && (
+        <Link to="/goals" className="glass mt-3 block rounded-2xl p-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="label flex items-center gap-1.5"><Target size={12} /> Major goals</span>
+            <ChevronRight size={14} className="text-muted" />
+          </div>
+          {activeGoals.slice(0, 3).map((g) => (
+            <div key={g.id} className="flex items-center justify-between gap-3 py-1 text-sm">
+              <span className="truncate font-semibold">{g.title}</span>
+              {g.pastDue ? <span className="shrink-0 text-xs font-bold text-bad">PAST DUE</span> : <span className="shrink-0"><Countdown to={g.deadlineAt} /></span>}
+            </div>
+          ))}
+        </Link>
+      )}
 
       <SectionTitle right={<span className="text-xs font-bold text-muted">{todayHabits.filter((h) => h.log).length}/{todayHabits.length}</span>}>Daily Habits</SectionTitle>
       {sortedHabits.length === 0 ? (

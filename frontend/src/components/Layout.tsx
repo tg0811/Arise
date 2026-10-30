@@ -1,11 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Swords, User, Settings, type LucideIcon } from 'lucide-react';
+import { Swords, Target, ShoppingBag, User, Settings, type LucideIcon } from 'lucide-react';
 import type { AppState } from '../lib/api';
 import { Header } from './Header';
 
-// More tabs (Goals, Store, Archive) arrive with later phases.
+// Archive arrives with phase 3.
 export const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Today', icon: Swords },
+  { to: '/goals', label: 'Goals', icon: Target },
+  { to: '/store', label: 'Store', icon: ShoppingBag },
   { to: '/character', label: 'Character', icon: User },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

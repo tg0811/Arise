@@ -5,10 +5,14 @@ import type { DB } from './db.ts';
 import { tx } from './db.ts';
 import { COOKIE, checkPassword, createSession, deleteSession, isConfigured, isValidSession, setPassword } from './auth.ts';
 import {
-  HttpError, buildState, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
+  HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
   getProfile, getTask, logWeight, settle, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, localDate } from '../../shared/engine.ts';
+import { DIFFICULTIES, GOAL_TYPES, localDate } from '../../shared/engine.ts';
+import { fullState } from './state.ts';
+import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
+import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
+import { createEntry, deleteEntry, updateEntry } from './journal.ts';
 
 const difficulty = z.enum(DIFFICULTIES as [string, ...string[]]);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -64,14 +68,43 @@ const QuestEditBody = z.object({
   deadlineAt: z.string().datetime(),
 });
 
-export function createApp(db: DB, clock: () => Date = () => new Date()) {
+const GoalBody = z.object({
+  title: z.string().trim().min(1).max(100),
+  description: z.string().max(1000).default(''),
+  type: z.enum(GOAL_TYPES as [string, ...string[]]),
+  categoryId: z.number().int().nullable(),
+  deadlineAt: z.string().datetime(),
+  xp: z.number().int().min(10).max(100_000),
+});
+
+const StoreItemBody = z.object({
+  name: z.string().trim().min(1).max(60),
+  description: z.string().max(300).default(''),
+  icon: z.string().max(40).default('gift'),
+  cost: z.number().int().min(1).max(1_000_000),
+  currency: z.enum(['credits', 'gems']),
+  lootable: z.boolean().default(true),
+});
+
+const JournalText = {
+  title: z.string().max(120).default(''),
+  body: z.string().max(10_000).default(''),
+  planned: z.string().max(4000).default(''),
+  happened: z.string().max(4000).default(''),
+  why: z.string().max(4000).default(''),
+  next: z.string().max(4000).default(''),
+};
+const JournalBody = z.object({ kind: z.enum(['note', 'aar']), goalId: z.number().int().nullable().default(null), ...JournalText });
+const JournalEditBody = z.object(JournalText);
+
+export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: () => number) {
   const app = new Hono();
   const secure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : process.env.NODE_ENV === 'production';
-  const ctx = (): Ctx => ({ db, at: clock() });
+  const ctx = (): Ctx => ({ db, at: clock(), rng });
   const state = () => {
     const c = ctx();
     settle(c);
-    return buildState(c);
+    return fullState(c);
   };
 
   app.onError((err, c) => {
@@ -203,7 +236,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date()) {
       const cx = ctx();
       settle(cx);
       fn(cx, id(c.req.param('id')));
-      return c.json(buildState(cx));
+      return c.json(fullState(cx));
     });
   }
 
@@ -213,7 +246,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date()) {
     const cx = ctx();
     settle(cx);
     createQuest(cx, b as Parameters<typeof createQuest>[1]);
-    return c.json(buildState(cx));
+    return c.json(fullState(cx));
   });
 
   app.put('/api/quests/:id', async (c) => {
@@ -230,7 +263,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date()) {
     const cx = ctx();
     deleteQuest(cx, id(c.req.param('id')));
     settle(cx);
-    return c.json(buildState(cx));
+    return c.json(fullState(cx));
   });
 
   for (const [action, fn] of [['complete', completeQuest], ['fail', failQuest], ['undo', undoQuest]] as const) {
@@ -238,9 +271,58 @@ export function createApp(db: DB, clock: () => Date = () => new Date()) {
       const cx = ctx();
       settle(cx);
       fn(cx, id(c.req.param('id')));
-      return c.json(buildState(cx));
+      return c.json(fullState(cx));
     });
   }
+
+  // ------------------------------------------------------------ phase 2
+  // Every mutation settles first (deadlines may have passed) and returns the fresh state.
+  const mutate = (fn: (cx: Ctx) => unknown) => {
+    const cx = ctx();
+    settle(cx);
+    fn(cx);
+    return fullState(cx);
+  };
+
+  app.post('/api/goals', async (c) => {
+    const b = GoalBody.parse(await c.req.json());
+    return c.json(mutate((cx) => createGoal(cx, b as Parameters<typeof createGoal>[1])));
+  });
+  app.put('/api/goals/:id', async (c) => {
+    const b = GoalBody.parse(await c.req.json());
+    return c.json(mutate((cx) => updateGoal(cx, id(c.req.param('id')), b as Parameters<typeof updateGoal>[2])));
+  });
+  app.delete('/api/goals/:id', (c) => c.json(mutate((cx) => deleteGoal(cx, id(c.req.param('id'))))));
+  app.post('/api/goals/:id/complete', (c) => c.json(mutate((cx) => completeGoal(cx, id(c.req.param('id'))))));
+  app.post('/api/goals/:id/undo', (c) => c.json(mutate((cx) => undoGoal(cx, id(c.req.param('id'))))));
+
+  app.post('/api/store', async (c) => {
+    const b = StoreItemBody.parse(await c.req.json());
+    return c.json(mutate((cx) => createItem(cx, b)));
+  });
+  app.put('/api/store/:id', async (c) => {
+    const b = StoreItemBody.parse(await c.req.json());
+    return c.json(mutate((cx) => updateItem(cx, id(c.req.param('id')), b)));
+  });
+  app.delete('/api/store/:id', (c) => c.json(mutate((cx) => deleteItem(cx, id(c.req.param('id'))))));
+  app.post('/api/store/:id/buy', (c) => c.json(mutate((cx) => buyItem(cx, id(c.req.param('id'))))));
+  app.post('/api/inventory/:itemId/use', (c) => c.json(mutate((cx) => useItem(cx, id(c.req.param('itemId'))))));
+
+  app.post('/api/lootbox/open', (c) => {
+    let loot: ReturnType<typeof openLootbox> | undefined;
+    const state = mutate((cx) => { loot = openLootbox(cx); });
+    return c.json({ ...state, loot });
+  });
+
+  app.post('/api/journal', async (c) => {
+    const b = JournalBody.parse(await c.req.json());
+    return c.json(mutate((cx) => createEntry(cx, b)));
+  });
+  app.put('/api/journal/:id', async (c) => {
+    const b = JournalEditBody.parse(await c.req.json());
+    return c.json(mutate((cx) => updateEntry(cx, id(c.req.param('id')), b)));
+  });
+  app.delete('/api/journal/:id', (c) => c.json(mutate((cx) => deleteEntry(cx, id(c.req.param('id'))))));
 
   return app;
 }

@@ -1,36 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDb } from '../src/db.ts';
-import { createApp } from '../src/app.ts';
+import { harness } from './helpers.ts';
 import { levelFromXp, rankForLevel, totalXpForLevel, xpToNext } from '../../shared/engine.ts';
-
-// Drives the real HTTP app against an in-memory DB with a controllable clock.
-function harness(startIso = '2026-11-02T04:00:00Z') { // 09:30 IST, a Monday
-  const db = openDb(':memory:');
-  let now = new Date(startIso);
-  const app = createApp(db, () => now);
-  let cookie = '';
-  const call = async (method: string, path: string, body?: unknown) => {
-    const res = await app.request(path, {
-      method,
-      headers: { 'content-type': 'application/json', cookie },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const set = res.headers.get('set-cookie');
-    if (set) cookie = set.split(';')[0];
-    const json = await res.json();
-    if (!res.ok) throw Object.assign(new Error(json.error), { status: res.status });
-    return json;
-  };
-  return {
-    call,
-    advance: (hours: number) => { now = new Date(now.getTime() + hours * 3600_000); },
-    async boot() {
-      await call('POST', '/api/auth/setup', { password: 'arise123' });
-      return call('PUT', '/api/profile', { name: 'Jinwoo', timezone: 'Asia/Kolkata', onboarded: true });
-    },
-  };
-}
 
 test('xp curve and rank bands', () => {
   assert.equal(xpToNext(1), 110);

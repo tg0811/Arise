@@ -20,6 +20,8 @@ export class HttpError extends Error {
 export interface Ctx {
   db: DB;
   at: Date;
+  /** Randomness source in [0, 1); injectable so tests can pin lootbox rolls. */
+  rng?: () => number;
 }
 
 export interface Profile {
@@ -78,7 +80,7 @@ interface HabitLog {
 
 export const getProfile = (db: DB) => db.prepare('SELECT * FROM profile WHERE id = 1').get() as unknown as Profile;
 
-const today = (ctx: Ctx) => localDate(getProfile(ctx.db).timezone, ctx.at);
+export const today = (ctx: Ctx) => localDate(getProfile(ctx.db).timezone, ctx.at);
 
 export function getTask(db: DB, id: number): Task {
   const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as unknown as Task | undefined;
@@ -86,17 +88,17 @@ export function getTask(db: DB, id: number): Task {
   return t;
 }
 
-function addXp(ctx: Ctx, date: string, amount: number, categoryId: number | null, source: string, sourceId: number | null, note = '') {
+export function addXp(ctx: Ctx, date: string, amount: number, categoryId: number | null, source: string, sourceId: number | null, note = '') {
   ctx.db.prepare('INSERT INTO xp_events (at, date, amount, category_id, source, source_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(ctx.at.toISOString(), date, amount, categoryId, source, sourceId, note);
 }
 
-function addCurrency(ctx: Ctx, date: string, currency: 'credits' | 'gems', amount: number, source: string, sourceId: number | null, note = '') {
+export function addCurrency(ctx: Ctx, date: string, currency: 'credits' | 'gems', amount: number, source: string, sourceId: number | null, note = '') {
   ctx.db.prepare('INSERT INTO currency_events (at, date, currency, amount, source, source_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(ctx.at.toISOString(), date, currency, amount, source, sourceId, note);
 }
 
-function removeEvents(db: DB, source: string, sourceId: number) {
+export function removeEvents(db: DB, source: string, sourceId: number) {
   db.prepare('DELETE FROM xp_events WHERE source = ? AND source_id = ?').run(source, sourceId);
   db.prepare('DELETE FROM currency_events WHERE source = ? AND source_id = ?').run(source, sourceId);
 }
@@ -321,6 +323,14 @@ export function settle(ctx: Ctx) {
       .all(ctx.at.toISOString()) as unknown as Task[];
     for (const q of expired) failQuestInner(ctx, q, true);
 
+    // Major goals past their deadline pay the penalty once and stay on the board.
+    const lateGoals = ctx.db.prepare("SELECT id, title, xp, category_id, deadline_at FROM goals WHERE status = 'active' AND past_due = 0 AND deadline_at <= ?")
+      .all(ctx.at.toISOString()) as { id: number; title: string; xp: number; category_id: number | null; deadline_at: string }[];
+    for (const g of lateGoals) {
+      addXp(ctx, localDate(profile.timezone, new Date(g.deadline_at)), -g.xp, g.category_id, 'goal_penalty', g.id, `Goal deadline missed: ${g.title}`);
+      ctx.db.prepare('UPDATE goals SET past_due = 1 WHERE id = ?').run(g.id);
+    }
+
     const todayStr = localDate(profile.timezone, ctx.at);
     const yesterday = addDays(todayStr, -1);
     const last = getSetting(ctx.db, 'last_settled_date');
@@ -399,6 +409,17 @@ function globalStreak(stats: Map<string, DayStat>, todayStr: string) {
   return { current, best: Math.max(best, current) };
 }
 
+/** Per-day completion stats, the global streak and today's numbers. */
+export function dayProgress(ctx: Ctx, habits?: Task[]) {
+  const tz = getProfile(ctx.db).timezone;
+  const todayStr = localDate(tz, ctx.at);
+  const allHabits = habits ?? (ctx.db.prepare("SELECT * FROM tasks WHERE kind = 'habit' AND archived = 0").all() as unknown as Task[]);
+  const stats = dayStats(ctx, tz, todayStr, allHabits);
+  const streak = globalStreak(stats, todayStr);
+  const todayStat = stats.get(todayStr) ?? { total: 0, done: 0 };
+  return { stats, streak, todayStat, cleared: cleared(todayStat) };
+}
+
 export function buildState(ctx: Ctx) {
   const { db } = ctx;
   const profile = getProfile(db);
@@ -452,9 +473,7 @@ export function buildState(ctx: Ctx) {
       canUndo: q.status !== 'pending' && !!q.deadline_at && new Date(q.deadline_at) > ctx.at,
     }));
 
-  const stats = dayStats(ctx, tz, todayStr, allHabits);
-  const streak = globalStreak(stats, todayStr);
-  const todayStat = stats.get(todayStr) ?? { total: 0, done: 0 };
+  const { stats, streak, todayStat } = dayProgress(ctx, allHabits);
   let weekTotal = 0;
   let weekDone = 0;
   for (let i = 1; i <= 7; i++) {

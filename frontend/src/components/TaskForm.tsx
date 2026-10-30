@@ -3,15 +3,10 @@ import { Plus, Trash2, Repeat, Swords, Skull, Crown } from 'lucide-react';
 import { DIFFICULTIES, DIFFICULTY_XP, BOSS_MULTIPLIER, type Difficulty } from '@shared';
 import { useAction, type AppState, type Habit, type Quest } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
+import { toLocalInput } from '../lib/time';
 import { Button, CategoryIcon, useToast } from './ui';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-/** 'YYYY-MM-DDTHH:mm' in the device's local time, for <input type="datetime-local">. */
-function toLocalInput(d: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function endOfToday() {
   const d = new Date();
@@ -23,14 +18,14 @@ function endOfToday() {
 
 // A group, not a <label>: wrapping button pickers in a label makes taps on the
 // caption toggle the first button.
-const Field = ({ label, children }: { label: string; children: ReactNode }) => (
+export const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <div role="group" aria-label={label} className="mb-4">
     <span className="label mb-1.5 block">{label}</span>
     {children}
   </div>
 );
 
-function CategoryPicker({ s, value, onChange }: { s: AppState; value: number | null; onChange: (v: number | null) => void }) {
+export function CategoryPicker({ s, value, onChange }: { s: AppState; value: number | null; onChange: (v: number | null) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {s.categories.map((c) => {

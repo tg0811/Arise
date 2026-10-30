@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Difficulty, Mood, Rank } from '@shared';
+import type { Difficulty, GoalType, LootType, Mood, Rank } from '@shared';
 
 // Mirrors backend buildState(). Every mutation returns the full fresh state.
 export interface Category { id: number; name: string; color: string; icon: string; sort: number; xp: number; level: number; into: number; need: number; pct: number }
@@ -30,6 +30,28 @@ export interface AppState {
   habits: Habit[];
   quests: Quest[];
   weeklyBossAvailable: boolean;
+  goals: Goal[];
+  storeItems: StoreItem[];
+  inventory: {
+    owned: { itemId: number; name: string; description: string; icon: string; count: number }[];
+    used: { id: number; name: string; icon: string; source: 'store' | 'lootbox'; usedAt: string }[];
+  };
+  lootbox: { available: boolean; claimed: Loot | null };
+  journal: JournalEntry[];
+  /** Only present on the response to opening the lootbox. */
+  loot?: Loot;
+}
+
+export interface Goal {
+  id: number; title: string; description: string; type: GoalType; categoryId: number | null;
+  deadlineAt: string; xp: number; status: 'active' | 'done'; pastDue: boolean; completedAt: string | null;
+  reward: number; hasAar: boolean; canUndo: boolean;
+}
+export interface StoreItem { id: number; name: string; description: string; icon: string; cost: number; currency: 'credits' | 'gems'; lootable: boolean }
+export interface Loot { type: LootType; amount: number; itemName?: string }
+export interface JournalEntry {
+  id: number; date: string; kind: 'note' | 'aar'; goalId: number | null; goalTitle: string | null;
+  title: string; body: string; planned: string; happened: string; why: string; next: string; createdAt: string;
 }
 
 export class ApiError extends Error {

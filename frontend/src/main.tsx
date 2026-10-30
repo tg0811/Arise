@@ -20,6 +20,8 @@ import { Today } from './pages/Today';
 import { Character } from './pages/Character';
 import { Settings } from './pages/Settings';
 import { Rules } from './pages/Rules';
+import { Goals } from './pages/Goals';
+import { Store } from './pages/Store';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: (n, err: any) => err?.status !== 401 && n < 2 } },
@@ -41,6 +43,8 @@ function Game() {
       <Routes>
         <Route element={<Layout s={s} />}>
           <Route index element={<Today s={s} />} />
+          <Route path="goals" element={<Goals s={s} />} />
+          <Route path="store" element={<Store s={s} />} />
           <Route path="character" element={<Character s={s} />} />
           <Route path="settings" element={<Settings s={s} />} />
           <Route path="settings/rules" element={<Rules s={s} />} />

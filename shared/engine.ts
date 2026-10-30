@@ -147,6 +147,57 @@ export function moodFor(rate: number | null): Mood {
   return MOOD_TIERS.find((t) => rate >= t.min)!.mood;
 }
 
+// ---------------------------------------------------------------- major goals
+
+export type GoalType = 'siege' | 'forge' | 'gauntlet';
+export const GOAL_TYPES: GoalType[] = ['siege', 'forge', 'gauntlet'];
+
+/** Size presets: the reward on time, and the penalty when the deadline passes (gain = loss). */
+export const GOAL_SIZES: { id: string; label: string; xp: number }[] = [
+  { id: 'small', label: 'Small', xp: 250 },
+  { id: 'medium', label: 'Medium', xp: 500 },
+  { id: 'large', label: 'Large', xp: 1000 },
+  { id: 'epic', label: 'Epic', xp: 2000 },
+];
+
+/** A goal finished after its deadline (penalty already paid) still earns this share. */
+export const GOAL_LATE_SHARE = 0.5;
+
+export const goalReward = (xp: number, pastDue: boolean) => (pastDue ? Math.round(xp * GOAL_LATE_SHARE) : xp);
+
+/** XP for the first after-action review written about a goal. */
+export const JOURNAL_AAR_XP = 25;
+
+// ---------------------------------------------------------------- daily lootbox
+
+export type LootType = 'credits' | 'xp' | 'gems' | 'item';
+
+export const LOOT_ODDS: { type: LootType; chance: number; min: number; max: number }[] = [
+  { type: 'credits', chance: 0.5, min: 25, max: 75 },
+  { type: 'xp', chance: 0.25, min: 25, max: 75 },
+  { type: 'gems', chance: 0.1, min: 1, max: 2 },
+  { type: 'item', chance: 0.15, min: 1, max: 1 },
+];
+
+/** Streak bonus on credit/XP drops: +2% per streak day, up to +100%. */
+export const LOOT_STREAK_BONUS_PER_DAY = 0.02;
+export const LOOT_STREAK_BONUS_CAP = 1;
+/** One extra gem on gem drops per this many streak days. */
+export const LOOT_GEM_STREAK_STEP = 10;
+
+export const lootStreakBonus = (streak: number) => Math.min(streak * LOOT_STREAK_BONUS_PER_DAY, LOOT_STREAK_BONUS_CAP);
+
+/** Roll the daily lootbox. `rng` returns [0, 1). Item drops are resolved by the caller. */
+export function rollLoot(rng: () => number, streak: number): { type: LootType; amount: number } {
+  const roll = rng();
+  let acc = 0;
+  const entry = LOOT_ODDS.find((o) => (acc += o.chance) > roll) ?? LOOT_ODDS[0];
+  const base = entry.min + Math.floor(rng() * (entry.max - entry.min + 1));
+  if (entry.type === 'credits' || entry.type === 'xp') return { type: entry.type, amount: Math.floor(base * (1 + lootStreakBonus(streak))) };
+  if (entry.type === 'gems') return { type: 'gems', amount: base + Math.floor(streak / LOOT_GEM_STREAK_STEP) };
+  return { type: 'item', amount: 1 };
+}
+
 // ---------------------------------------------------------------- dates
 // Calendar dates are plain 'YYYY-MM-DD' strings in the player's timezone.
 

@@ -31,6 +31,10 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
   - **Habits** (THE-SYSTEM disciplines): recurring, optional weekdays, optional deadline time (displayed only). Self-report Complete or Fail. Anything unresolved auto-fails at midnight in the server's settlement.
   - **Quests** (LevelUp): one-off, with a deadline date+time and live countdown; auto-fail when the deadline passes. Options: **chains** (multi-part; next part unlocks on completion, a fail cancels the rest), **boss** (×3 both ways), **weekly mega boss** (max 1 per week; ±25% of the XP needed for the next level, frozen at creation).
 - **Major Goals:** a missed deadline applies the penalty once, and the goal **stays** (marked past due) until the owner removes it.
+- **Major Goals (decided 2026-10-30):** types Siege (exam) / Forge (project) / Gauntlet (event). Stakes are size presets: Small 250 · Medium 500 · Large 1000 · Epic 2000 XP. **Reward = penalty** (gain = loss). A missed deadline charges once and the goal **stays**; finishing late earns **50%**. Stakes and deadline lock after the miss. Removing never refunds.
+- **Daily payload (lootbox):** unlocks at ≥80% of today's tasks, one per day. Odds: 50% credits 25–75 · 25% XP 25–75 · 10% gems 1–2 · 15% a store reward flagged "lootable". Streak: +2%/day on credits/XP (cap +100%), +1 gem per 10 streak days.
+- **Store = real-world rewards only** (no buffs; the owner skipped them). Priced in credits or gems. Seeded with 6 editable starters. Items are archived, never deleted. Inventory keeps one row per unit; "Use" = redeem.
+- **Journal:** free notes (no XP) + After-Action Reviews (planned / happened / why / next) for conquered or past-due goals. The first AAR per goal gives **+25 Mind XP**.
 - **Mood** = completion rate over the last 7 days: Radiant ≥90% · Steady ≥60% · Worn ≥30% · Broken.
 - **Palette goes warm → cool with rank:** E looks like THE-SYSTEM (warm charcoal, coral) and S looks like LevelUp (deep navy, blue/violet glass). Panels: LevelUp glass plus THE-SYSTEM corner brackets. Fonts: Outfit (body), Cinzel (display).
 - **Avatar:** the owner's profile picture, framed by a rank aura that evolves (E dim → D halo → C ring → B mote → A spinning motes → S corona). No star/class picker.
@@ -44,8 +48,8 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - **Data model:** XP and currency are **ledgers** (`xp_events`, `currency_events`). Level, rank, attributes and wallet are all derived from them, the same idea as THE-SYSTEM's "derive from logs".
 
 ## Build phases
-1. **Foundation + core loop:** auth, onboarding, categories, habits, quests (chains/boss/weekly), XP/levels/ranks/de-leveling, attributes, streaks, settlement, header, Today page, Character page, rank theming, PWA shell.
-2. **Goals & economy:** Major Goals (G1/G2), My State (G3), wallet, lootbox at 80%, store, real-world rewards, inventory, journal/AAR (R1).
+1. ✅ **Foundation + core loop:** auth, onboarding, categories, habits, quests (chains/boss/weekly), XP/levels/ranks/de-leveling, attributes, streaks, settlement, header, Today page, Character page, rank theming, PWA shell.
+2. ✅ **Goals & economy:** Major Goals (G1/G2), My State (G3), wallet, lootbox at 80%, store, real-world rewards, inventory, journal/AAR (R1).
 3. **History & insight:** Archive (overview/history/streaks), 28-day heatmap, KPI cards, weekly XP chart, System Mechanics page, titles (M7).
 4. **Feel & reach:** Web Push interval reminders + quiet hours (**reminders count only tasks scheduled *today*; a habit's rest days never notify; send nothing when all are done**; proposed: a per-habit nudge before its "by HH:MM" deadline, e.g. 30 min before, on scheduled days only. Needs the HTTPS deploy to test on the phone), focus timer (F1), level-up generative art + sound, rank ascension splash, S-rank cutscene, ambient particles, Awakening cinematic polish, backup/restore/typed-phrase reset.
 5. **Deploy:** Docker + Caddy on Hetzner.
@@ -60,7 +64,6 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 ## Open questions
 - [ ] Weight trend chart and BMI on Character? (Data is already logged daily.)
 - [ ] Discuss: does the global streak also give a small XP bonus, or only scale the lootbox? (Currently lootbox only.)
-- [ ] Lootbox contents and store item ideas (phase 2).
 - [ ] Skills (K1–K6) are deferred ("Not now"). Q9 (link quests to topics) depends on them, so it is deferred too.
 - [ ] Maybes for later: mystery quests, weekday frequency (built into habits already), story arcs, 180-day journey / ascension map / final judgement, story/system log, dev testing panel.
 - [ ] Domain / subdomain on the Hetzner box.
@@ -72,6 +75,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - ❌ Reading other apps' screen time. The Veil is manual instead (decided).
 
 ## Progress
+- **2026-10-30**: **Phase 2 built and verified** (owner will test 2026-10-31). Major Goals, Mission (My State), Journal + AAR, daily payload, Store + Inventory, new nav tabs (Today · Goals · Store · Character · Settings), Rules page extended (sections 6–8). Backend 16/16 tests pass (7 new). A full browser walkthrough had no errors and the ledger math matched exactly. Migration 4 applies cleanly to the owner's real DB.
 - **2026-10-30**: Added **Rules of the System** page (Settings → `/settings/rules`; covers feature A6 early). Every number is read from `shared/engine.ts` (new constants: `CURVE_*`, `ATTR_SCALE`, `MOOD_TIERS`, `weeklyBossXp`), so the sheet cannot drift from the scoring. **When a rule changes, change the engine constant; the page updates itself.** Sections not yet built are marked "coming".
 - **2026-10-30**: Removed Social Media and Finance categories (migration 3).
 - **2026-10-30**: Pushed to **github.com/tg0811/Arise** (private, branch `main`). Only `SoloLeveling/` is versioned: the repo root *is* this folder. The reference apps in `Arise/` stay out.

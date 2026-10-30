@@ -117,6 +117,76 @@ const MIGRATIONS: string[] = [
     AND (id IN (SELECT category_id FROM tasks WHERE category_id IS NOT NULL) OR id IN (SELECT category_id FROM xp_events WHERE category_id IS NOT NULL));
   DELETE FROM categories WHERE name IN ('Social Media', 'Finance') AND archived = 0;
   `,
+  `
+  -- Phase 2: goals, store, inventory, lootbox, journal
+  CREATE TABLE goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL CHECK (type IN ('siege', 'forge', 'gauntlet')),
+    category_id INTEGER REFERENCES categories(id),
+    deadline_at TEXT NOT NULL,
+    xp INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'done')),
+    past_due INTEGER NOT NULL DEFAULT 0,
+    completed_at TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE store_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    icon TEXT NOT NULL DEFAULT 'gift',
+    cost INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'credits' CHECK (currency IN ('credits', 'gems')),
+    lootable INTEGER NOT NULL DEFAULT 1,
+    archived INTEGER NOT NULL DEFAULT 0,
+    sort INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+
+  -- One row per owned unit, so the history of every redemption is kept.
+  CREATE TABLE inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL REFERENCES store_items(id),
+    source TEXT NOT NULL CHECK (source IN ('store', 'lootbox')),
+    acquired_at TEXT NOT NULL,
+    used_at TEXT
+  );
+
+  CREATE TABLE lootbox_claims (
+    date TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    item_id INTEGER,
+    at TEXT NOT NULL
+  );
+
+  CREATE TABLE journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('note', 'aar')),
+    goal_id INTEGER REFERENCES goals(id),
+    title TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    planned TEXT NOT NULL DEFAULT '',
+    happened TEXT NOT NULL DEFAULT '',
+    why TEXT NOT NULL DEFAULT '',
+    next TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  -- Starter rewards; edit or delete freely.
+  INSERT INTO store_items (name, description, icon, cost, currency, sort, created_at) VALUES
+    ('Fancy coffee', 'One coffee from your favourite café.', 'coffee', 100, 'credits', 0, datetime('now')),
+    ('One episode', 'One episode of a series, guilt-free.', 'tv', 150, 'credits', 1, datetime('now')),
+    ('Gaming hour', 'One hour of games, no guilt.', 'gamepad', 200, 'credits', 2, datetime('now')),
+    ('Movie night', 'A full movie, snacks included.', 'film', 300, 'credits', 3, datetime('now')),
+    ('Cheat meal', 'One meal off the plan.', 'pizza', 400, 'credits', 4, datetime('now')),
+    ('Something you wanted', 'Buy that thing you have been eyeing.', 'gift', 10, 'gems', 5, datetime('now'));
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

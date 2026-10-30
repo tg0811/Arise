@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import {
   Brain, Dumbbell, Sparkles, BookOpen, Smartphone, Wallet, Heart, Flame, Music, Code, Palette, Users,
-  Moon, Sun, Coffee, Leaf, Target, Trophy, PenTool, Briefcase, Bed, Droplet, Footprints, Swords, type LucideIcon,
+  Moon, Sun, Coffee, Leaf, Target, Trophy, PenTool, Briefcase, Bed, Droplet, Footprints, Swords,
+  Gift, Tv, Gamepad2, Film, Pizza, IceCream, Plane, Headphones, Shirt, ShoppingBag, type LucideIcon,
 } from 'lucide-react';
 
 export const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -12,6 +13,32 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   coffee: Coffee, leaf: Leaf, target: Target, trophy: Trophy, 'pen-tool': PenTool, briefcase: Briefcase,
   bed: Bed, droplet: Droplet, footprints: Footprints, swords: Swords,
 };
+
+/** Icons for store rewards (a superset: rewards can also use category icons). */
+export const REWARD_ICONS: Record<string, LucideIcon> = {
+  gift: Gift, coffee: Coffee, tv: Tv, gamepad: Gamepad2, film: Film, pizza: Pizza, 'ice-cream': IceCream,
+  plane: Plane, headphones: Headphones, shirt: Shirt, bag: ShoppingBag, music: Music, 'book-open': BookOpen, moon: Moon,
+};
+
+export const RewardIcon = ({ name, size = 18, className }: { name: string; size?: number; className?: string }) => {
+  const Icon = REWARD_ICONS[name] ?? CATEGORY_ICONS[name] ?? Gift;
+  return <Icon size={size} className={className} />;
+};
+
+/** Segmented tab switcher used by multi-section pages. */
+export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; badge?: number }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <div className="mt-3 flex gap-1 rounded-xl border border-line p-1">
+      {tabs.map((t) => (
+        <button key={t.id} onClick={() => onChange(t.id)}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-black uppercase tracking-[0.12em] transition ${value === t.id ? 'bg-accent/20 text-ink' : 'text-muted hover:text-ink2'}`}>
+          {t.label}
+          {!!t.badge && <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">{t.badge}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export const CategoryIcon = ({ name, size = 14, className }: { name: string; size?: number; className?: string }) => {
   const Icon = CATEGORY_ICONS[name] ?? Target;
