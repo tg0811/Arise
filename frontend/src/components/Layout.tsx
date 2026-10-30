@@ -19,7 +19,11 @@ const MOBILE_NAV = NAV.filter((n) => n.to !== '/settings');
 export function Layout({ s }: { s: AppState }) {
   // A new page starts at the top, not at the previous page's scroll position.
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Block body on purpose: newer Chrome returns a Promise from scrollTo, and an effect that
+  // returns a non-function crashes React ("destroy is not a function").
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return (
     <div className="mx-auto flex min-h-dvh max-w-6xl">
       {/* Desktop sidebar */}
