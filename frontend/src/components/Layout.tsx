@@ -1,18 +1,24 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { Swords, Target, ShoppingBag, User, Settings, type LucideIcon } from 'lucide-react';
+import { useEffect } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Swords, Target, ShoppingBag, ScrollText, User, Settings, type LucideIcon } from 'lucide-react';
 import type { AppState } from '../lib/api';
 import { Header } from './Header';
 
-// Archive arrives with phase 3.
 export const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Today', icon: Swords },
   { to: '/goals', label: 'Goals', icon: Target },
   { to: '/store', label: 'Store', icon: ShoppingBag },
+  { to: '/archive', label: 'Archive', icon: ScrollText },
   { to: '/character', label: 'Character', icon: User },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
+// Phones get five tabs; Settings lives behind the gear in the header instead.
+const MOBILE_NAV = NAV.filter((n) => n.to !== '/settings');
 
 export function Layout({ s }: { s: AppState }) {
+  // A new page starts at the top, not at the previous page's scroll position.
+  const { pathname } = useLocation();
+  useEffect(() => window.scrollTo(0, 0), [pathname]);
   return (
     <div className="mx-auto flex min-h-dvh max-w-6xl">
       {/* Desktop sidebar */}
@@ -38,7 +44,7 @@ export function Layout({ s }: { s: AppState }) {
 
       {/* Mobile bottom bar */}
       <nav className="glass-solid safe-bottom fixed inset-x-0 bottom-0 z-40 flex rounded-t-2xl border-b-0 md:hidden">
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {MOBILE_NAV.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === "/"}
             className={({ isActive }) => `flex flex-1 flex-col items-center gap-0.5 py-2.5 transition ${isActive ? 'text-accent' : 'text-muted'}`}>
             {({ isActive }) => (

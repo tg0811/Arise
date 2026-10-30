@@ -1,4 +1,5 @@
-import { Flame, Coins, Gem } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Flame, Coins, Gem, Settings } from 'lucide-react';
 import type { AppState } from '../lib/api';
 import { Avatar } from './Avatar';
 import { BodyStats } from './BodyStats';
@@ -13,6 +14,7 @@ export function Header({ s }: { s: AppState }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-lg font-black tracking-tight">{s.profile.name}</h1>
+            {s.equippedTitle && <span className="hidden truncate text-xs italic text-ink2 min-[400px]:inline">« {s.equippedTitle.name} »</span>}
             {s.streak.current > 0 && (
               <span className="pulse-glow flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-xs font-bold text-gold" title="Daily streak">
                 <Flame size={12} /> {s.streak.current}
@@ -28,6 +30,9 @@ export function Header({ s }: { s: AppState }) {
           <span className="flex items-center gap-1 text-gold"><Coins size={13} /> {s.wallet.credits}</span>
           <span className="flex items-center gap-1 text-accent2"><Gem size={13} /> {s.wallet.gems}</span>
         </div>
+        <Link to="/settings" aria-label="Settings" className="-mr-1 self-start rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-ink md:hidden">
+          <Settings size={18} />
+        </Link>
       </div>
 
       <div className="mt-3">

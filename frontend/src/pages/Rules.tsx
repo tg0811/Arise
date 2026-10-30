@@ -149,12 +149,13 @@ export function Rules({ s }: { s: AppState }) {
           rows={LOOT_ODDS.map((o) => [<span className="capitalize">{o.type}</span>, pct(o.chance), o.type === 'item' ? '1 reward' : `${o.min}–${o.max}`])} />
       </Panel>
 
-      <SectionTitle>8 · Store, inventory &amp; journal</SectionTitle>
+      <SectionTitle>8 · Store, journal &amp; titles</SectionTitle>
       <Panel className="p-4">
         <ul className="space-y-2">
           <Rule>The store holds <b className="text-ink">real-world rewards</b> that you price yourself. Buying moves one into your inventory; <b className="text-ink">Use</b> means you go enjoy it.</Rule>
           <Rule>Credits come from completing tasks and goals. Gems are rare and only drop from the payload, so price your biggest treats in gems.</Rule>
           <Rule>Writing an <b className="text-ink">after-action review</b> for a conquered or past-due goal earns +{JOURNAL_AAR_XP} Mind XP (once per goal). Free notes earn nothing; they're just for you.</Rule>
+          <Rule><b className="text-ink">Titles</b> are earned by milestones, never luck: streaks, tasks completed, bosses, chains, goals, reviews, payloads, max level, and an Adept (Lv 10) and Master (Lv 25) title for every category. Once earned, a title is yours even if the streak behind it breaks. Equip one on the Character page. You have {s.titles.filter((t) => t.unlocked).length} of {s.titles.length}.</Rule>
         </ul>
       </Panel>
 

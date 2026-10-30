@@ -187,6 +187,14 @@ const MIGRATIONS: string[] = [
     ('Cheat meal', 'One meal off the plan.', 'pizza', 400, 'credits', 4, datetime('now')),
     ('Something you wanted', 'Buy that thing you have been eyeing.', 'gift', 10, 'gems', 5, datetime('now'));
   `,
+  `
+  -- Phase 3: earned titles. Once unlocked, a title is kept forever (even if the streak behind it breaks).
+  CREATE TABLE title_unlocks (
+    key TEXT PRIMARY KEY,
+    unlocked_at TEXT NOT NULL
+  );
+  ALTER TABLE profile ADD COLUMN equipped_title TEXT;
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

@@ -13,6 +13,8 @@ import { fullState } from './state.ts';
 import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
 import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
 import { createEntry, deleteEntry, updateEntry } from './journal.ts';
+import { equipTitle } from './titles.ts';
+import { archiveState } from './archive.ts';
 
 const difficulty = z.enum(DIFFICULTIES as [string, ...string[]]);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -29,6 +31,7 @@ const ProfileBody = z.object({
   onboarded: z.boolean().optional(),
   myState: z.record(z.string(), z.string().max(4000)).optional(),
   heightCm: z.number().min(50).max(260).nullable().optional(),
+  equippedTitle: z.string().max(80).nullable().optional(),
   weightKg: z.number().min(20).max(400).optional(),
 });
 
@@ -171,6 +174,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
       );
       // Logged after the timezone update so the weigh-in lands on the right local day.
       if (b.weightKg !== undefined) logWeight(ctx(), Math.round(b.weightKg * 10) / 10);
+      if (b.equippedTitle !== undefined) equipTitle(ctx(), b.equippedTitle);
     });
     return c.json(state());
   });
@@ -323,6 +327,15 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     return c.json(mutate((cx) => updateEntry(cx, id(c.req.param('id')), b)));
   });
   app.delete('/api/journal/:id', (c) => c.json(mutate((cx) => deleteEntry(cx, id(c.req.param('id'))))));
+
+  // ------------------------------------------------------------ phase 3
+  app.get('/api/archive', (c) => {
+    const before = c.req.query('before');
+    if (before !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(before)) throw new HttpError(400, 'before must be YYYY-MM-DD');
+    const cx = ctx();
+    settle(cx);
+    return c.json(archiveState(cx, before));
+  });
 
   return app;
 }

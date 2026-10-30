@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Difficulty, GoalType, LootType, Mood, Rank } from '@shared';
 
 // Mirrors backend buildState(). Every mutation returns the full fresh state.
@@ -40,7 +40,44 @@ export interface AppState {
   journal: JournalEntry[];
   /** Only present on the response to opening the lootbox. */
   loot?: Loot;
+  titles: Title[];
+  equippedTitle: { key: string; name: string } | null;
 }
+
+export interface Title { key: string; name: string; hint: string; cur: number; target: number; unlocked: boolean; unlockedAt: string | null }
+
+// ---------------------------------------------------------------- archive (fetched on demand)
+
+export interface DayStat { date: string; total: number; done: number; gained: number; lost: number }
+export interface HistoryEvent { at: string; kind: 'xp' | 'purchase'; amount: number; currency?: 'credits' | 'gems'; categoryId: number | null; source: string; note: string }
+export interface HabitStreak {
+  id: number; title: string; categoryId: number | null; difficulty: Difficulty; days: string;
+  current: number; best: number; done: number; failed: number; rate: number | null;
+  strip: ('done' | 'failed' | 'rest' | 'pending' | 'none')[];
+}
+export interface Archive {
+  today: string;
+  overview: {
+    tasksDone: number; tasksFailed: number; completionRate: number | null; questsCleared: number; bossesSlain: number;
+    goalsConquered: number; payloadsOpened: number; reviews: number; itemsRedeemed: number; creditsEarned: number;
+    firstDay: string | null; daysActive: number; currentStreak: number; bestStreak: number;
+  };
+  heatmap: DayStat[];
+  week: DayStat[];
+  history: (DayStat & { events: HistoryEvent[] })[];
+  historyNext: string | null;
+  habitStreaks: HabitStreak[];
+}
+
+/** Archive pages: the first carries everything; later pages only add older history. */
+export const useArchive = () =>
+  useInfiniteQuery({
+    queryKey: ['archive'],
+    queryFn: ({ pageParam }) => api<Archive>('GET', `/archive${pageParam ? `?before=${pageParam}` : ''}`),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.historyNext,
+    staleTime: 0,
+  });
 
 export interface Goal {
   id: number; title: string; description: string; type: GoalType; categoryId: number | null;
@@ -82,6 +119,9 @@ export function useAction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ method = 'POST', path, body }: { method?: string; path: string; body?: unknown }) => api(method, path, body),
-    onSuccess: (state) => qc.setQueryData(['state'], state),
+    onSuccess: (state) => {
+      qc.setQueryData(['state'], state);
+      qc.invalidateQueries({ queryKey: ['archive'] });
+    },
   });
 }

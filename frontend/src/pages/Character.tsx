@@ -1,9 +1,9 @@
-import { Flame, Trophy, Coins, Gem, Sun, Cloud, CloudRain, CloudLightning } from 'lucide-react';
+import { Flame, Trophy, Coins, Gem, Sun, Cloud, CloudRain, CloudLightning, Lock, Award } from 'lucide-react';
 import { RANKS, totalXpForLevel } from '@shared';
-import type { AppState } from '../lib/api';
+import { useAction, type AppState } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
-import { CategoryIcon, Panel, ProgressBar, SectionTitle } from '../components/ui';
+import { CategoryIcon, Panel, ProgressBar, SectionTitle, useToast } from '../components/ui';
 import { rankColor } from '../lib/theme';
 
 const MOODS = {
@@ -26,6 +26,7 @@ export function Character({ s }: { s: AppState }) {
         <Avatar src={s.profile.avatar} name={s.profile.name} rank={p.rank} size={120} />
         <h2 className="mt-3 text-2xl font-black">{s.profile.name}</h2>
         <p className="font-display text-base font-bold tracking-[0.2em] text-rank">{p.title.toUpperCase()}</p>
+        {s.equippedTitle && <p className="mt-1 text-sm italic text-ink2">« {s.equippedTitle.name} »</p>}
         <div className="mt-2"><BodyStats s={s} /></div>
         <div className="mt-4 flex items-center gap-6">
           <div><div className="font-display text-5xl font-bold text-rank text-glow">{p.rank}</div><div className="label">Rank</div></div>
@@ -76,6 +77,8 @@ export function Character({ s }: { s: AppState }) {
         ))}
       </div>
 
+      <Titles s={s} />
+
       <SectionTitle>Rank ladder</SectionTitle>
       <Panel brackets={false} className="divide-y divide-line">
         {RANKS.map((r) => {
@@ -102,5 +105,54 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
       <div className="flex items-center gap-2">{icon}<span className="label">{label}</span></div>
       <div className="mt-1 text-xl font-black">{value}</div>
     </Panel>
+  );
+}
+
+/** Earned titles: unlocked ones can be equipped (shown with your name); locked ones show progress. */
+function Titles({ s }: { s: AppState }) {
+  const action = useAction();
+  const toast = useToast();
+  const equip = (key: string | null, name?: string) =>
+    action.mutate({ method: 'PUT', path: '/profile', body: { equippedTitle: key } }, {
+      onSuccess: () => toast(key ? `Title equipped: ${name}` : 'Title removed', 'good'),
+      onError: (e) => toast(e.message, 'bad'),
+    });
+  const unlocked = s.titles.filter((t) => t.unlocked);
+  const locked = s.titles.filter((t) => !t.unlocked).sort((a, b) => b.cur / b.target - a.cur / a.target);
+
+  return (
+    <>
+      <SectionTitle right={<span className="text-xs font-bold text-muted">{unlocked.length}/{s.titles.length}</span>}>Titles</SectionTitle>
+      {unlocked.length === 0 && <p className="mb-3 text-sm text-muted">No titles yet. They're earned by milestones, not luck.</p>}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {unlocked.map((t) => {
+          const on = s.equippedTitle?.key === t.key;
+          return (
+            <Panel key={t.key} brackets={on} className={`flex items-center gap-3 p-3 ${on ? 'border-accent/60' : ''}`}>
+              <Award size={18} className="shrink-0 text-gold" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display font-bold tracking-wide">{t.name}</span>
+                <span className="block truncate text-xs text-muted">{t.hint}</span>
+              </span>
+              <button onClick={() => equip(on ? null : t.key, t.name)} disabled={action.isPending}
+                className={`shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-black uppercase tracking-wider ${on ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
+                {on ? 'Equipped' : 'Equip'}
+              </button>
+            </Panel>
+          );
+        })}
+        {locked.map((t) => (
+          <Panel key={t.key} brackets={false} className="flex items-center gap-3 p-3 opacity-70">
+            <Lock size={16} className="shrink-0 text-muted" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-display font-bold tracking-wide text-ink2">{t.name}</span>
+              <span className="block truncate text-xs text-muted">{t.hint}</span>
+              <ProgressBar pct={t.cur / t.target} className="mt-1.5 h-1" />
+            </span>
+            <span className="shrink-0 text-xs tabular-nums text-muted">{t.cur.toLocaleString()}/{t.target.toLocaleString()}</span>
+          </Panel>
+        ))}
+      </div>
+    </>
   );
 }
