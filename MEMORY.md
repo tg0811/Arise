@@ -47,7 +47,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 1. **Foundation + core loop:** auth, onboarding, categories, habits, quests (chains/boss/weekly), XP/levels/ranks/de-leveling, attributes, streaks, settlement, header, Today page, Character page, rank theming, PWA shell.
 2. **Goals & economy:** Major Goals (G1/G2), My State (G3), wallet, lootbox at 80%, store, real-world rewards, inventory, journal/AAR (R1).
 3. **History & insight:** Archive (overview/history/streaks), 28-day heatmap, KPI cards, weekly XP chart, System Mechanics page, titles (M7).
-4. **Feel & reach:** Web Push interval reminders + quiet hours, focus timer (F1), level-up generative art + sound, rank ascension splash, S-rank cutscene, ambient particles, Awakening cinematic polish, backup/restore/typed-phrase reset.
+4. **Feel & reach:** Web Push interval reminders + quiet hours (**reminders count only tasks scheduled *today*; a habit's rest days never notify; send nothing when all are done**; proposed: a per-habit nudge before its "by HH:MM" deadline, e.g. 30 min before, on scheduled days only. Needs the HTTPS deploy to test on the phone), focus timer (F1), level-up generative art + sound, rank ascension splash, S-rank cutscene, ambient particles, Awakening cinematic polish, backup/restore/typed-phrase reset.
 5. **Deploy:** Docker + Caddy on Hetzner.
 
 ## Implementation notes (non-obvious)
