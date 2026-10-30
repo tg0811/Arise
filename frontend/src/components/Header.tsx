@@ -19,7 +19,7 @@ export function Header({ s }: { s: AppState }) {
               </span>
             )}
           </div>
-          <p className="truncate font-display text-xs font-bold tracking-[0.15em] text-accent">
+          <p className="truncate font-display text-sm font-bold tracking-[0.15em] text-rank">
             {p.rank}-RANK · {p.title.toUpperCase()}
           </p>
           <BodyStats s={s} size="sm" />

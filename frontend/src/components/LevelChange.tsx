@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { RANKS, type Rank } from '@shared';
 import type { AppState } from '../lib/api';
+import { RANK_COLORS, rankColor } from '../lib/theme';
 
 type Change = { kind: 'up' | 'down'; level: number; rank: Rank; title: string; rankChanged: boolean };
 
@@ -35,7 +36,7 @@ export function LevelChange({ s }: { s: AppState | undefined }) {
         <motion.div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/85 px-6 text-center backdrop-blur-md"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setChange(null)}>
           <motion.div className="absolute h-72 w-72 rounded-full"
-            style={{ background: `radial-gradient(circle, ${up ? 'color-mix(in srgb, var(--sl-accent) 55%, transparent)' : 'rgba(248,113,113,.35)'}, transparent 70%)` }}
+            style={{ background: `radial-gradient(circle, ${!up ? 'rgba(248,113,113,.35)' : change.rankChanged ? `color-mix(in srgb, ${rankColor(change.rank)} 55%, transparent)` : 'color-mix(in srgb, var(--sl-accent) 55%, transparent)'}, transparent 70%)` }}
             initial={{ scale: 0.2 }} animate={{ scale: [0.2, 1.4, 1.1] }} transition={{ duration: 1.4 }} />
           <motion.p className="label relative mb-3 !text-ink2" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
             {up ? (change.rankChanged ? 'Rank ascension' : 'Level achieved') : change.rankChanged ? 'Rank lost' : 'Level lost'}
@@ -49,8 +50,8 @@ export function LevelChange({ s }: { s: AppState | undefined }) {
           </motion.p>
           {change.rankChanged && (
             <motion.div className="relative mt-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }}>
-              <div className="font-display text-7xl font-black text-accent2 text-glow">{change.rank}</div>
-              <div className="mt-1 font-display text-lg tracking-[0.25em] text-ink">{change.title.toUpperCase()}</div>
+              <div className="font-display text-8xl font-bold text-glow" style={{ color: rankColor(change.rank) }}>{change.rank}</div>
+              <div className="mt-1 font-display text-xl font-bold tracking-[0.25em]" style={{ color: RANK_COLORS[change.rank].glow }}>{change.title.toUpperCase()}</div>
               {!up && <div className="mt-2 text-sm text-ink2">Reclaim it. {RANKS.find((r) => r.rank === change.rank)?.title} is not your ceiling.</div>}
             </motion.div>
           )}

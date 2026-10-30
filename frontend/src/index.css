@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-/* Colors are CSS variables set per rank by lib/theme.ts, so the whole app re-themes on rank change. */
+/* System colours are fixed (Solo Leveling blue). Only --sl-rank / --sl-rank-glow change, set per rank by lib/theme.ts. */
 @theme {
   --font-sans: 'Outfit', system-ui, sans-serif;
-  --font-display: 'Cinzel', 'Outfit', serif;
+  --font-display: 'Rajdhani', 'Outfit', sans-serif;
   --color-bg: var(--sl-bg);
   --color-panel: var(--sl-panel);
   --color-accent: var(--sl-accent);
@@ -12,21 +12,26 @@
   --color-ink2: var(--sl-text2);
   --color-muted: var(--sl-muted);
   --color-line: var(--sl-line);
+  --color-rank: var(--sl-rank);
+  --color-rank-glow: var(--sl-rank-glow);
   --color-good: #4ade80;
   --color-bad: #f87171;
   --color-gold: #eab308;
 }
 
 :root {
-  /* E-rank defaults so first paint isn't unstyled before JS applies the theme */
-  --sl-bg: #1a1714;
-  --sl-panel: #26211c;
-  --sl-accent: #d97757;
-  --sl-accent2: #e3b341;
-  --sl-text: #f2ede4;
-  --sl-text2: #b3aa9b;
-  --sl-muted: #7a7266;
-  --sl-line: rgba(217, 119, 87, 0.16);
+  /* The System: LevelUp's deep navy with blue/cyan glow */
+  --sl-bg: #020617;
+  --sl-panel: #0f172a;
+  --sl-accent: #3b82f6;
+  --sl-accent2: #22d3ee;
+  --sl-text: #f8fafc;
+  --sl-text2: #94a3b8;
+  --sl-muted: #64748b;
+  --sl-line: rgba(59, 130, 246, 0.2);
+  /* Rank colour (E default until JS applies the real rank) */
+  --sl-rank: #d97757;
+  --sl-rank-glow: #f0a07e;
   color-scheme: dark;
 }
 
@@ -42,7 +47,7 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* Soft accent glows behind everything (LevelUp's ambient light) */
+/* Soft blue system light, plus one faint corner of your rank colour */
 body::before {
   content: '';
   position: fixed;
@@ -51,7 +56,8 @@ body::before {
   z-index: 0;
   background:
     radial-gradient(ellipse 70% 45% at 10% -5%, color-mix(in srgb, var(--sl-accent) 16%, transparent), transparent 70%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, var(--sl-accent2) 10%, transparent), transparent 70%);
+    radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, var(--sl-accent2) 10%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 100% 100%, color-mix(in srgb, var(--sl-rank) 9%, transparent), transparent 70%);
   transition: background 1.2s ease;
 }
 
@@ -64,7 +70,8 @@ body::before {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--sl-line);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  /* System-window feel: faint inner blue glow */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 0 22px rgba(59, 130, 246, 0.06);
 }
 
 .label {

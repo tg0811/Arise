@@ -8,7 +8,7 @@ import {
   GOAL_LATE_SHARE, GOAL_SIZES, JOURNAL_AAR_XP, LOOT_GEM_STREAK_STEP, LOOT_ODDS, LOOT_STREAK_BONUS_CAP, LOOT_STREAK_BONUS_PER_DAY, lootStreakBonus,
 } from '@shared';
 import type { AppState } from '../lib/api';
-import { DIFFICULTY_STYLE } from '../lib/theme';
+import { DIFFICULTY_STYLE, rankColor } from '../lib/theme';
 import { Panel, SectionTitle } from '../components/ui';
 
 // Every number here is read from shared/engine.ts — the same code the server
@@ -178,14 +178,14 @@ export function Rules({ s }: { s: AppState }) {
           head={['Rank', 'Title', 'Levels']}
           highlight={rankRow}
           rows={RANKS.map((r, i) => [
-            <span className="font-display text-lg text-accent">{r.rank}</span>,
+            <span className="font-display text-xl font-bold" style={{ color: rankColor(r.rank) }}>{r.rank}</span>,
             <span className="font-display tracking-wider">{r.title}</span>,
             `${r.minLevel}–${RANKS[i + 1] ? RANKS[i + 1].minLevel - 1 : MAX_LEVEL}`,
           ])}
         />
       </Panel>
       <ul className="mt-3 space-y-2 px-1">
-        <Rule>Each rank recolors the System: warm embers at E, cooling to deep blue and violet at S.</Rule>
+        <Rule>Your rank colour, on the badge, title, aura and rank-up, shifts warm to cool as you climb: E ember → D amber → C emerald → B cyan → A blue → S shadow-monarch violet.</Rule>
         <Rule>Your avatar's aura grows with rank: E dim · D halo · C ring · B orbiting mote · A spinning motes · S corona.</Rule>
       </ul>
 

@@ -36,7 +36,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - **Store = real-world rewards only** (no buffs; the owner skipped them). Priced in credits or gems. Seeded with 6 editable starters. Items are archived, never deleted. Inventory keeps one row per unit; "Use" = redeem.
 - **Journal:** free notes (no XP) + After-Action Reviews (planned / happened / why / next) for conquered or past-due goals. The first AAR per goal gives **+25 Mind XP**.
 - **Mood** = completion rate over the last 7 days: Radiant ≥90% · Steady ≥60% · Worn ≥30% · Broken.
-- **Palette goes warm → cool with rank:** E looks like THE-SYSTEM (warm charcoal, coral) and S looks like LevelUp (deep navy, blue/violet glass). Panels: LevelUp glass plus THE-SYSTEM corner brackets. Fonts: Outfit (body), Cinzel (display).
+- **UI palette (revised 2026-10-31):** a fixed **Solo Leveling / LevelUp "System" blue** for all chrome: bg `#020617`, panels `#0f172a` glass with a faint inner blue glow, accent blue `#3b82f6`, accent2 cyan `#22d3ee`, corner brackets in blue. **The warm → cool shift applies only to rank elements** via `--sl-rank` (`text-rank` utilities; `RANK_COLORS` / `rankColor()` in `frontend/src/lib/theme.ts`): E ember `#d97757` → D amber → C emerald → B cyan → A blue → S shadow-monarch violet `#a78bfa`. Rank elements: header rank line, Character title and rank letter, avatar aura and LV badge, rank-up splash, rank ladder and Rules table (each rank in its own colour), one faint corner glow. **Fonts:** Outfit (body) + **Rajdhani** (display/HUD), which replaced Cinzel at the owner's choice.
 - **Avatar:** the owner's profile picture, framed by a rank aura that evolves (E dim → D halo → C ring → B mote → A spinning motes → S corona). No star/class picker.
 - **Screen time (The Veil):** a manual habit, now best under **Mind** (it's a discipline). Over the threshold = Fail.
 
@@ -75,6 +75,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 - ❌ Reading other apps' screen time. The Veil is manual instead (decided).
 
 ## Progress
+- **2026-10-31**: Re-themed to System blue. Rank colour only on rank elements; Rajdhani headings. Verified at E/C/S in the browser, including a live rank-up into S.
 - **2026-10-30**: **Phase 2 built and verified** (owner will test 2026-10-31). Major Goals, Mission (My State), Journal + AAR, daily payload, Store + Inventory, new nav tabs (Today · Goals · Store · Character · Settings), Rules page extended (sections 6–8). Backend 16/16 tests pass (7 new). A full browser walkthrough had no errors and the ledger math matched exactly. Migration 4 applies cleanly to the owner's real DB.
 - **2026-10-30**: Added **Rules of the System** page (Settings → `/settings/rules`; covers feature A6 early). Every number is read from `shared/engine.ts` (new constants: `CURVE_*`, `ATTR_SCALE`, `MOOD_TIERS`, `weeklyBossXp`), so the sheet cannot drift from the scoring. **When a rule changes, change the engine constant; the page updates itself.** Sections not yet built are marked "coming".
 - **2026-10-30**: Removed Social Media and Finance categories (migration 3).

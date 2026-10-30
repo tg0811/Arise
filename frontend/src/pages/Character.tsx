@@ -4,6 +4,7 @@ import type { AppState } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
 import { CategoryIcon, Panel, ProgressBar, SectionTitle } from '../components/ui';
+import { rankColor } from '../lib/theme';
 
 const MOODS = {
   radiant: { icon: Sun, label: 'Radiant', hint: '≥90% cleared this week' },
@@ -24,10 +25,10 @@ export function Character({ s }: { s: AppState }) {
       <Panel className="mt-3 flex flex-col items-center p-6 text-center">
         <Avatar src={s.profile.avatar} name={s.profile.name} rank={p.rank} size={120} />
         <h2 className="mt-3 text-2xl font-black">{s.profile.name}</h2>
-        <p className="font-display text-sm font-bold tracking-[0.2em] text-accent">{p.title.toUpperCase()}</p>
+        <p className="font-display text-base font-bold tracking-[0.2em] text-rank">{p.title.toUpperCase()}</p>
         <div className="mt-2"><BodyStats s={s} /></div>
         <div className="mt-4 flex items-center gap-6">
-          <div><div className="font-display text-4xl font-black text-accent2 text-glow">{p.rank}</div><div className="label">Rank</div></div>
+          <div><div className="font-display text-5xl font-bold text-rank text-glow">{p.rank}</div><div className="label">Rank</div></div>
           <div className="h-10 w-px bg-line" />
           <div><div className="font-display text-4xl font-black">{p.level}</div><div className="label">Level</div></div>
           <div className="h-10 w-px bg-line" />
@@ -81,8 +82,10 @@ export function Character({ s }: { s: AppState }) {
           const current = r.rank === p.rank;
           const reached = p.level >= r.minLevel;
           return (
-            <div key={r.rank} className={`flex items-center gap-4 px-4 py-3 ${current ? 'bg-accent/10' : ''}`}>
-              <span className={`w-8 font-display text-2xl font-black ${reached ? 'text-accent' : 'text-muted'}`}>{r.rank}</span>
+            // Each rank in its own colour, so the warm → cool climb is visible at a glance.
+            <div key={r.rank} className="flex items-center gap-4 px-4 py-3"
+              style={current ? { background: `color-mix(in srgb, ${rankColor(r.rank)} 14%, transparent)`, boxShadow: `inset 3px 0 0 ${rankColor(r.rank)}` } : undefined}>
+              <span className={`w-8 font-display text-3xl font-bold ${reached ? 'text-glow' : 'opacity-35'}`} style={{ color: rankColor(r.rank) }}>{r.rank}</span>
               <span className={`flex-1 font-display text-sm tracking-wider ${reached ? 'text-ink' : 'text-muted'}`}>{r.title}</span>
               <span className="text-xs text-muted">Lv {r.minLevel}+</span>
             </div>
