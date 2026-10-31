@@ -152,7 +152,7 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
     <div>
       <div className="mb-3 flex items-end justify-between">
         <div>
-          <p className="label">{session.scheduled ? 'In the Gate' : 'Extra session'}</p>
+          <p className="label">{session.scheduled ? 'In the Temple' : 'Extra session'}</p>
           <h2 className="font-display text-2xl font-bold tracking-wider">{session.title}</h2>
         </div>
         <div className="text-right">

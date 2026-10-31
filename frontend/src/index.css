@@ -35,7 +35,7 @@
   color-scheme: dark;
 }
 
-/* The Gate (workout dimension): a crimson "Red Gate" world. Same variables, different values,
+/* The Iron Temple (workout dimension, internally "gate"): a crimson world. Same variables, different values,
    so every component re-themes. Rank colours (--sl-rank) are untouched. */
 :root[data-dimension="gate"] {
   --sl-bg: #0b0506;

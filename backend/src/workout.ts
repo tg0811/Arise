@@ -2,7 +2,7 @@ import { getSetting, seedWorkoutDays, setSetting, tx, type DB } from './db.ts';
 import { HttpError, addCurrency, addXp, getProfile, removeEvents, today, type Ctx } from './game.ts';
 import { WORKOUT_XP, addDays, creditsFor, e1rm, weekStart, weekday, type ExerciseKind } from '../../shared/engine.ts';
 
-// The Gate: a Mon–Sun workout plan, logged sessions (sets × reps × kg), PRs and a weekly streak.
+// The Iron Temple (internally "gate"): a Mon–Sun workout plan, logged sessions (sets × reps × kg), PRs and a weekly streak.
 // Scheduled workout days move Body XP like a Hard habit (gain = loss); extra sessions are log-only.
 
 const SINCE_KEY = 'workout_schedule_since';

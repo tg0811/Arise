@@ -5,14 +5,14 @@ import type { AppState } from '../lib/api';
 import { Header } from './Header';
 import { FocusBar } from './Focus';
 
-// The Gate is an ordinary tab; only its icon is crimson, a quiet hint that it leads to another world.
+// The Iron Temple (internally "gate") is an ordinary tab; only its icon is crimson, a quiet hint that it leads to another world.
 const GATE_RED = '#dc2626';
 
 export const NAV: { to: string; label: string; icon: LucideIcon; tint?: string }[] = [
   { to: '/', label: 'Today', icon: Swords },
   { to: '/goals', label: 'Goals', icon: Target },
   { to: '/store', label: 'Store', icon: ShoppingBag },
-  { to: '/gate', label: 'Gate', icon: Orbit, tint: GATE_RED },
+  { to: '/gate', label: 'Temple', icon: Orbit, tint: GATE_RED },
   { to: '/character', label: 'Character', icon: User },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
