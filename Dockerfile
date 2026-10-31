@@ -1,4 +1,4 @@
-# Arise: one image that serves the API and the built PWA. Caddy (deploy/compose.yaml) terminates TLS in front of it.
+# Arise: one image that serves the API and the built PWA. The host's nginx terminates TLS in front of it (deploy/nginx-arise.conf).
 
 FROM node:26-slim AS build
 WORKDIR /app

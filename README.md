@@ -40,9 +40,9 @@ npm start                       # backend serves the API and the built PWA on :8
 
 Environment: `PORT` (8787), `DATA_DIR` (`./data`), `INITIAL_PASSWORD` (first start only), `COOKIE_SECURE` (defaults to true in production; it must run behind HTTPS).
 
-## Deploy (Hetzner, Docker + Caddy)
+## Deploy (Hetzner, Docker behind the host's nginx)
 
-Step-by-step runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md). Runs on `tghf-prod` in `/opt/tghf/solo-leveling`: the app container plus Caddy, which gets the Let's Encrypt certificate and terminates HTTPS. Live at `https://89-167-82-104.sslip.io`.
+Step-by-step runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md). Runs on `tghf-prod` in `/opt/tghf/solo-leveling`: the app container on `127.0.0.1:8787`, behind the server's existing nginx (site file `deploy/nginx-arise.conf`, HTTPS via certbot). Live at `https://89-167-82-104.sslip.io`.
 
 ```bash
 ./deploy.sh                     # rsync this folder to the server, rebuild, health-check
@@ -51,4 +51,4 @@ Step-by-step runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md). Runs on `tghf-prod` in
 - The server holds the **live database** in `deploy/data/` (never synced by `deploy.sh`); local `data/` is only a dev copy.
 - `deploy/.env` on the server sets `DOMAIN` and `INITIAL_PASSWORD` (see `deploy/.env.example`). The initial password is applied only when the database has none yet; change it in Settings → Change password (this signs out every other device). It lives only in the server's `.env`, never in git.
 - Nightly backups: cron runs `deploy/backup.sh` at 03:15 and keeps 14 snapshots in `deploy/data/backups/`.
-- **Changing the domain:** point its DNS at the server, edit `DOMAIN` in `deploy/.env`, then `docker compose up -d`. A new domain is a new browser origin: reinstall the PWA, log in again and re-enable notifications. No data is lost.
+- **Changing the domain:** see the end of `docs/DEPLOY.md` (new nginx `server_name` + certbot). A new domain is a new browser origin: reinstall the PWA, log in again and re-enable notifications. No data is lost.

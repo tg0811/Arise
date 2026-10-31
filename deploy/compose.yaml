@@ -1,4 +1,5 @@
 # Run from this folder: docker compose up -d --build
+# The host's nginx (deploy/nginx-arise.conf) terminates HTTPS and proxies to the app on localhost only.
 services:
   app:
     build: ..
@@ -7,25 +8,7 @@ services:
       TZ: UTC
       # Only used when the database has no password yet (first start). Change it in Settings afterwards.
       INITIAL_PASSWORD: ${INITIAL_PASSWORD:-}
+    ports:
+      - "127.0.0.1:8787:8787" # not reachable from outside; nginx is the only way in
     volumes:
       - ./data:/data
-    # No published port: only Caddy reaches it, over the compose network.
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    depends_on: [app]
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  caddy_data:
-  caddy_config:
