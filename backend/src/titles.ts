@@ -46,9 +46,9 @@ const FIXED_TITLES: TitleDef[] = [
   { key: 'reflective', name: 'The Reflective', hint: 'Write 5 after-action reviews', progress: (m) => at(m.reviews, 5) },
   { key: 'treasure_hunter', name: 'Treasure Hunter', hint: 'Open 30 daily payloads', progress: (m) => at(m.payloadsOpened, 30) },
   { key: 'shadow_monarch', name: 'Shadow Monarch', hint: `Reach level ${MAX_LEVEL}`, progress: (m) => at(m.level, MAX_LEVEL) },
-  { key: 'gatekeeper', name: 'Temple Initiate', hint: 'Finish your first workout in the Iron Temple', progress: (m) => at(m.workoutsDone, 1) },
+  { key: 'gatekeeper', name: 'Dungeon Initiate', hint: 'Finish your first workout in the Instant Dungeon', progress: (m) => at(m.workoutsDone, 1) },
   { key: 'iron_disciple', name: 'Iron Disciple', hint: `Hold a ${GATE_TITLE_WEEKS.iron}-week workout streak`, progress: (m) => at(m.bestWeekStreak, GATE_TITLE_WEEKS.iron) },
-  { key: 'dungeon_breaker', name: 'Temple Guardian', hint: `Hold a ${GATE_TITLE_WEEKS.breaker}-week workout streak`, progress: (m) => at(m.bestWeekStreak, GATE_TITLE_WEEKS.breaker) },
+  { key: 'dungeon_breaker', name: 'Dungeon Breaker', hint: `Hold a ${GATE_TITLE_WEEKS.breaker}-week workout streak`, progress: (m) => at(m.bestWeekStreak, GATE_TITLE_WEEKS.breaker) },
   { key: 'centurion_of_iron', name: 'Centurion of Iron', hint: 'Finish 100 workouts', progress: (m) => at(m.workoutsDone, 100) },
 ];
 

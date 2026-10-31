@@ -5,7 +5,7 @@ import { ChevronLeft, Flame, Swords, CalendarDays, History, Dumbbell, Loader2, t
 import { useGate } from '../../lib/api';
 import { GenerativeArt, VORTEX_SIM } from '../../components/fx';
 
-// The Iron Temple (internally "gate"): a separate dimension. Its own crimson palette (data-dimension on <html>), its own
+// The Instant Dungeon (internally "gate"): a separate dimension. Its own crimson palette (data-dimension on <html>), its own
 // top bar and tabs; the main header and navigation are gone until you go back to Arise.
 
 const GATE_NAV: { to: string; label: string; icon: LucideIcon }[] = [
@@ -26,11 +26,11 @@ function Portal({ leaving }: { leaving: boolean }) {
       <div className="relative px-8 text-center">
         <motion.p className="font-display text-2xl font-bold tracking-[0.4em] text-[#fbf4f4]"
           initial={{ opacity: 0, letterSpacing: '0.1em' }} animate={{ opacity: 1, letterSpacing: '0.4em' }} transition={{ duration: 0.6 }}>
-          {leaving ? 'ARISE' : 'IRON TEMPLE'}
+          {leaving ? 'ARISE' : 'ENTERING THE DUNGEON'}
         </motion.p>
         <motion.p className="mt-3 text-sm italic text-[#c9a9a9]"
           initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.5 }}>
-          {leaving ? 'You leave stronger than you entered.' : 'The Iron Temple does not close.'}
+          {leaving ? '[ Dungeon cleared. You leave stronger than you entered. ]' : '[ You have entered the Instant Dungeon. ]'}
         </motion.p>
       </div>
     </motion.div>
@@ -78,7 +78,7 @@ export function GateLayout() {
         <button onClick={leave} className="flex items-center gap-0.5 rounded-lg py-1.5 pl-1 pr-2.5 text-sm font-bold text-ink2 hover:bg-white/5 hover:text-ink">
           <ChevronLeft size={18} /> Arise
         </button>
-        <h1 className="flex-1 text-center font-display text-lg font-bold tracking-[0.3em] text-accent">IRON TEMPLE</h1>
+        <h1 className="flex-1 text-center font-display text-lg font-bold tracking-[0.25em] text-accent">INSTANT DUNGEON</h1>
         <span className="flex min-w-[4.5rem] items-center justify-end gap-1 pr-1 text-sm font-bold text-accent2" title="Weekly workout streak">
           <Flame size={15} /> {g?.streak.current ?? 0}<span className="text-xs font-semibold text-muted">wk</span>
         </span>
