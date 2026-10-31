@@ -42,7 +42,7 @@ Environment: `PORT` (8787), `DATA_DIR` (`./data`), `INITIAL_PASSWORD` (first sta
 
 ## Deploy (Hetzner, Docker + Caddy)
 
-Runs on `tghf-prod` in `/opt/tghf/solo-leveling`: the app container plus Caddy, which gets the Let's Encrypt certificate and terminates HTTPS. Live at `https://89-167-82-104.sslip.io`.
+Step-by-step runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md). Runs on `tghf-prod` in `/opt/tghf/solo-leveling`: the app container plus Caddy, which gets the Let's Encrypt certificate and terminates HTTPS. Live at `https://89-167-82-104.sslip.io`.
 
 ```bash
 ./deploy.sh                     # rsync this folder to the server, rebuild, health-check
