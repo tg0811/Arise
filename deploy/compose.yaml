@@ -1,0 +1,29 @@
+# Run from this folder: docker compose up -d --build
+services:
+  app:
+    build: ..
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+    volumes:
+      - ./data:/data
+    # No published port: only Caddy reaches it, over the compose network.
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

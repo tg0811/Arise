@@ -39,3 +39,16 @@ npm start                       # backend serves the API and the built PWA on :8
 ```
 
 Environment: `PORT` (8787), `DATA_DIR` (`./data`), `COOKIE_SECURE` (defaults to true in production; it must run behind HTTPS).
+
+## Deploy (Hetzner, Docker + Caddy)
+
+Runs on `tghf-prod` in `/opt/tghf/solo-leveling`: the app container plus Caddy, which gets the Let's Encrypt certificate and terminates HTTPS. Live at `https://89-167-82-104.sslip.io`.
+
+```bash
+./deploy.sh                     # rsync this folder to the server, rebuild, health-check
+```
+
+- The server holds the **live database** in `deploy/data/` (never synced by `deploy.sh`); local `data/` is only a dev copy.
+- `deploy/.env` on the server sets `DOMAIN` (see `deploy/.env.example`).
+- Nightly backups: cron runs `deploy/backup.sh` at 03:15 and keeps 14 snapshots in `deploy/data/backups/`.
+- **Changing the domain:** point its DNS at the server, edit `DOMAIN` in `deploy/.env`, then `docker compose up -d`. A new domain is a new browser origin: reinstall the PWA, log in again and re-enable notifications. No data is lost.

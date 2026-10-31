@@ -1,0 +1,5 @@
+# Caddy fetches and renews the Let's Encrypt certificate for $DOMAIN and redirects HTTP to HTTPS.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:8787
+}
