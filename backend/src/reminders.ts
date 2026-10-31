@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import { getSetting, setSetting, type DB } from './db.ts';
 import { HttpError, getProfile, type Ctx, type Task } from './game.ts';
+import { todayWorkout } from './workout.ts';
 import {
   DEFAULT_REMINDERS, inQuietHours, isScheduled, localDate, localMinute, minuteOfDay, type ReminderPrefs,
 } from '../../shared/engine.ts';
@@ -134,9 +135,10 @@ export function dueReminders(ctx: Ctx): PushMessage[] {
   const doneQuestsToday = (db.prepare("SELECT completed_at FROM tasks WHERE kind = 'quest' AND status = 'done' AND completed_at IS NOT NULL").all() as { completed_at: string }[])
     .filter((q) => localDate(tz, new Date(q.completed_at)) === today).length;
 
-  // Interval reminder
-  const open = openHabits.length + questsDueToday.length;
-  const total = habits.length + questsDueToday.length + doneQuestsToday;
+  // Interval reminder (today's scheduled workout counts as one task)
+  const tw = todayWorkout(ctx);
+  const open = openHabits.length + questsDueToday.length + (tw && !tw.done ? 1 : 0);
+  const total = habits.length + questsDueToday.length + doneQuestsToday + (tw ? 1 : 0);
   const last = getSetting(db, 'last_reminder_at');
   const due = !last || at.getTime() - Date.parse(last) >= prefs.intervalHours * 3_600_000;
   if (open > 0 && due && !inQuietHours(nowMin, prefs.quietStart, prefs.quietEnd)) {

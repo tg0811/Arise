@@ -47,6 +47,8 @@ export interface AppState {
   titles: Title[];
   equippedTitle: { key: string; name: string } | null;
   focus: { id: number; title: string; categoryId: number | null; plannedMin: number; startedAt: string } | null;
+  /** Today's scheduled workout (null on rest days / no plan). */
+  workoutToday: { name: string; done: boolean; total: number; completed: number } | null;
   reminders: ReminderPrefs & { devices: number };
 }
 
@@ -127,6 +129,51 @@ export function useAction() {
     mutationFn: ({ method = 'POST', path, body }: { method?: string; path: string; body?: unknown }) => api(method, path, body),
     onSuccess: (state) => {
       qc.setQueryData(['state'], state);
+      qc.invalidateQueries({ queryKey: ['archive'] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------- the gate (workouts)
+
+export type ExerciseKind = 'strength' | 'bodyweight' | 'cardio';
+export interface GateSet { id: number; setNo: number; reps: number | null; kg: number | null; seconds: number | null; km: number | null; done: boolean }
+export interface Prs { kg: number; e1rm: number; reps: number; seconds: number; km: number }
+export interface PlanItem { id: number; exerciseId: number; name: string; kind: ExerciseKind; targetSets: number; targetReps: number | null; targetKg: number | null; targetMin: number | null }
+export interface PlanDay { weekday: number; name: string; isRest: boolean; scheduled: boolean; items: PlanItem[] }
+export interface GateExercise { id: number; name: string; kind: ExerciseKind; muscle: string; archived: boolean; prs: Prs; sessions: number; series: ({ date: string } & Prs)[] }
+export interface GateSession {
+  id: number; title: string; scheduled: boolean; status: 'active' | 'done'; startedAt: string | null; finishedAt: string | null; note: string;
+  exercises: { exerciseId: number; name: string; kind: ExerciseKind; sets: GateSet[]; previous: GateSet[] }[];
+}
+export interface GateHistory {
+  id: number; date: string; title: string; status: 'active' | 'done' | 'missed'; scheduled: boolean; minutes: number | null; note: string;
+  sets: number; volume: number; prs: number; exercises: { name: string; sets: GateSet[] }[];
+}
+export interface Gate {
+  today: string;
+  scheduleSince: string | null;
+  plan: PlanDay[];
+  week: { date: string; name: string; status: 'done' | 'missed' | 'planned' | 'rest' | 'active' | 'extra'; isToday: boolean }[];
+  todayPlan: PlanDay;
+  session: GateSession | null;
+  history: GateHistory[];
+  exercises: GateExercise[];
+  streak: { current: number; best: number; weeks: { start: string; status: 'complete' | 'broken' | 'none' | 'open' }[] };
+  workoutsDone: number;
+}
+
+export const useGate = () => useQuery({ queryKey: ['gate'], queryFn: async () => (await api<{ gate: Gate; state: AppState }>('GET', '/gate')).gate });
+
+/** Gate mutations return both the Gate's state and the main app's (XP, header, Today). */
+export function useGateAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ method = 'POST', path, body }: { method?: string; path: string; body?: unknown }) =>
+      api<{ gate: Gate; state: AppState; id?: number }>(method, `/gate${path}`, body),
+    onSuccess: (r) => {
+      qc.setQueryData(['gate'], r.gate);
+      qc.setQueryData(['state'], r.state);
       qc.invalidateQueries({ queryKey: ['archive'] });
     },
   });

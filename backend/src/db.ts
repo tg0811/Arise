@@ -218,6 +218,62 @@ const MIGRATIONS: string[] = [
   ALTER TABLE tasks ADD COLUMN private INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE sessions ADD COLUMN private_until TEXT;
   `,
+  `
+  -- Phase 5: The Gate (workouts)
+  CREATE TABLE exercises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'strength' CHECK (kind IN ('strength', 'bodyweight', 'cardio')),
+    muscle TEXT NOT NULL DEFAULT '',
+    archived INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+
+  -- One row per weekday (0 = Sunday … 6 = Saturday). A day is scheduled when it isn't rest and has exercises.
+  CREATE TABLE workout_days (
+    weekday INTEGER PRIMARY KEY CHECK (weekday BETWEEN 0 AND 6),
+    name TEXT NOT NULL DEFAULT '',
+    is_rest INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE workout_plan_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    weekday INTEGER NOT NULL REFERENCES workout_days(weekday),
+    exercise_id INTEGER NOT NULL REFERENCES exercises(id),
+    sort INTEGER NOT NULL DEFAULT 0,
+    target_sets INTEGER NOT NULL DEFAULT 3,
+    target_reps INTEGER,
+    target_kg REAL,
+    target_min REAL
+  );
+
+  -- One session per date. scheduled = it was a planned workout day (only those move XP and streaks).
+  CREATE TABLE workout_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL DEFAULT '',
+    scheduled INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT,
+    finished_at TEXT,
+    status TEXT NOT NULL CHECK (status IN ('active', 'done', 'missed')),
+    note TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE TABLE workout_sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES workout_sessions(id),
+    exercise_id INTEGER NOT NULL REFERENCES exercises(id),
+    sort INTEGER NOT NULL DEFAULT 0,
+    set_no INTEGER NOT NULL,
+    reps INTEGER,
+    kg REAL,
+    seconds INTEGER,
+    km REAL,
+    done INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX workout_sets_session ON workout_sets(session_id);
+  CREATE INDEX workout_sets_exercise ON workout_sets(exercise_id, done);
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [
@@ -244,6 +300,7 @@ function migrate(db: DB) {
       if (v === 0) seed(db);
       if (v === 1) db.prepare('UPDATE profile SET height_cm = 167 WHERE id = 1').run();
       if (v === 3) seedRewards(db);
+      if (v === 7) seedWorkoutDays(db);
       db.exec(`PRAGMA user_version = ${v + 1}`);
       db.exec('COMMIT');
     } catch (e) {
@@ -268,6 +325,12 @@ const STARTER_REWARDS: [string, string, string, number, 'credits' | 'gems'][] = 
   ['Cheat meal', 'One meal off the plan.', 'pizza', 400, 'credits'],
   ['Something you wanted', 'Buy that thing you have been eyeing.', 'gift', 10, 'gems'],
 ];
+
+/** The seven weekday rows of the workout plan (all rest until planned). Safe to call repeatedly. */
+export function seedWorkoutDays(db: DB) {
+  const ins = db.prepare('INSERT OR IGNORE INTO workout_days (weekday) VALUES (?)');
+  for (let d = 0; d < 7; d++) ins.run(d);
+}
 
 /** Starter store rewards; the owner edits or deletes them freely. */
 export function seedRewards(db: DB) {

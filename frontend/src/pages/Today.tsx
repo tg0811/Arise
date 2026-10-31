@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Moon, Target, ChevronRight, Timer } from 'lucide-react';
+import { Plus, Moon, Target, ChevronRight, Timer, Orbit } from 'lucide-react';
 import { FocusForm } from '../components/Focus';
 import { PrivateUnlockedBar } from '../components/Private';
 import { LootboxButton } from '../components/Lootbox';
@@ -42,6 +42,17 @@ export function Today({ s }: { s: AppState }) {
           <span className="absolute top-0 h-2.5 w-0.5 bg-gold" style={{ left: `${DAY_CLEAR_RATIO * 100}%` }} title="Clear line" />
         </div>
       </Panel>
+
+      {s.workoutToday && (
+        <Link to="/gate" className={`glass mt-3 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm ${s.workoutToday.done ? 'opacity-70' : ''}`}>
+          <Orbit size={17} style={{ color: '#dc2626' }} />
+          <span className="flex-1">
+            <span className="font-bold">Today: {s.workoutToday.name}</span>
+            <span className="ml-2 text-ink2">{s.workoutToday.done ? 'cleared ✓' : s.workoutToday.completed ? `${s.workoutToday.completed}/${s.workoutToday.total}` : `${s.workoutToday.total} exercise${s.workoutToday.total === 1 ? '' : 's'}`}</span>
+          </span>
+          <ChevronRight size={16} className="text-muted" />
+        </Link>
+      )}
 
       {!s.focus && (
         <button onClick={() => setFocusOpen(true)} className="glass mt-3 flex w-full items-center gap-3 rounded-2xl p-3 text-left transition hover:border-accent">

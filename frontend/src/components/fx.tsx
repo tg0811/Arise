@@ -108,8 +108,11 @@ const SIMS: Sim[] = [
   },
 ];
 
-/** Full-screen generative art behind the level-up splash; a random sim each time. */
-export function GenerativeArt({ color, color2 }: { color: string; color2: string }) {
+/** Index of the vortex sim in SIMS, used for the Gate's portal. */
+export const VORTEX_SIM = 4;
+
+/** Full-screen generative art behind the level-up splash; a random sim each time unless `sim` is given. */
+export function GenerativeArt({ color, color2, sim }: { color: string; color2: string; sim?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -119,7 +122,7 @@ export function GenerativeArt({ color, color2 }: { color: string; color2: string
     const w = window.innerWidth, h = window.innerHeight;
     canvas.width = w * dpr; canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
-    const frame = SIMS[Math.floor(Math.random() * SIMS.length)](w, h, color, color2);
+    const frame = SIMS[sim ?? Math.floor(Math.random() * SIMS.length)](w, h, color, color2);
     let t = 0, raf = 0;
     const loop = () => {
       ctx.fillStyle = 'rgba(2, 6, 23, 0.09)'; // fading trails
@@ -129,7 +132,7 @@ export function GenerativeArt({ color, color2 }: { color: string; color2: string
     };
     loop();
     return () => cancelAnimationFrame(raf);
-  }, [color, color2]);
+  }, [color, color2, sim]);
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 h-full w-full" />;
 }
 

@@ -220,6 +220,20 @@ export function focusReward(plannedMin: number, elapsedMin: number): { xp: numbe
   };
 }
 
+// ---------------------------------------------------------------- the gate (workouts)
+
+/** A completed scheduled workout day gives this much Body XP; a missed one costs the same. */
+export const WORKOUT_XP = 50;
+
+export type ExerciseKind = 'strength' | 'bodyweight' | 'cardio';
+export const EXERCISE_KINDS: ExerciseKind[] = ['strength', 'bodyweight', 'cardio'];
+
+/** Estimated one-rep max (Epley). */
+export const e1rm = (kg: number, reps: number) => (kg > 0 && reps > 0 ? Math.round(kg * (1 + reps / 30) * 10) / 10 : 0);
+
+/** Weekly streak milestones that unlock titles. */
+export const GATE_TITLE_WEEKS = { iron: 4, breaker: 12 };
+
 // ---------------------------------------------------------------- reminders
 
 export interface ReminderPrefs {

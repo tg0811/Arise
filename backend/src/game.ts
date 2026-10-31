@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { DB } from './db.ts';
 import { getSetting, setSetting, tx } from './db.ts';
+import { settleWorkoutDay, todayWorkout, workoutDayStats } from './workout.ts';
 import {
   BOSS_MULTIPLIER, DAY_CLEAR_RATIO, DIFFICULTY_XP, MAX_LEVEL,
   addDays, attributeLevel, creditsFor, isScheduled, levelFromXp, localDate, moodFor,
@@ -350,6 +351,7 @@ export function settle(ctx: Ctx) {
     if (last >= yesterday) return;
     const habits = ctx.db.prepare("SELECT * FROM tasks WHERE kind = 'habit' AND archived = 0").all() as unknown as Task[];
     for (let d = addDays(last, 1); d <= yesterday; d = addDays(d, 1)) {
+      settleWorkoutDay(ctx, d);
       for (const h of habits) {
         if (h.created_date > d || !isScheduled(h.days, d)) continue;
         if (getHabitLog(ctx.db, h.id, d)) continue;
@@ -382,6 +384,10 @@ function dayStats(ctx: Ctx, tz: string, todayStr: string, habits: Task[]): Map<s
   for (const h of habits) {
     if (!h.archived && isScheduled(h.days, todayStr) && h.created_date <= todayStr && !loggedToday.has(h.id)) bump(todayStr, false);
   }
+  // Scheduled workout days count like a task: done or missed, and today's if still open.
+  for (const w of workoutDayStats(ctx.db)) bump(w.date, w.done);
+  const tw = todayWorkout(ctx);
+  if (tw && !tw.done) bump(todayStr, false);
   const quests = ctx.db.prepare("SELECT status, deadline_at, completed_at FROM tasks WHERE kind = 'quest' AND status IN ('pending', 'done', 'failed')")
     .all() as { status: string; deadline_at: string | null; completed_at: string | null }[];
   for (const q of quests) {

@@ -11,7 +11,7 @@ import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
   getProfile, getTask, logWeight, settle, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, FOCUS_MAX_MIN, GOAL_TYPES, localDate } from '../../shared/engine.ts';
+import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, localDate } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
 import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
 import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
@@ -21,6 +21,10 @@ import { archiveState } from './archive.ts';
 import { abandonFocus, completeFocus, startFocus } from './focus.ts';
 import { sendTest, setPrefs, subscribe, unsubscribe, vapidKeys, webPushSender, type Sender } from './reminders.ts';
 import { exportData, resetData, restoreData } from './backup.ts';
+import {
+  addExerciseToSession, addPlanItem, addSet, archiveExercise, createExercise, discardSession, finishSession, gateState,
+  removePlanItem, removeSet, reorderPlanItems, startSession as startWorkout, undoFinish, updateDay, updateExercise, updatePlanItem, updateSet,
+} from './workout.ts';
 
 const difficulty = z.enum(DIFFICULTIES as [string, ...string[]]);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -120,6 +124,33 @@ const PushSubBody = z.object({
   expirationTime: z.number().nullable().optional(),
   keys: z.object({ p256dh: z.string(), auth: z.string() }),
 });
+
+const ExerciseBody = z.object({
+  name: z.string().trim().min(1).max(60),
+  kind: z.enum(EXERCISE_KINDS as [string, ...string[]]).default('strength'),
+  muscle: z.string().trim().max(40).default(''),
+});
+const num = (max: number) => z.number().min(0).max(max).nullable().default(null);
+const PlanItemBody = z.object({
+  exerciseId: z.number().int(),
+  targetSets: z.number().int().min(1).max(20).default(3),
+  targetReps: z.number().int().min(1).max(500).nullable().default(null),
+  targetKg: num(1000),
+  targetMin: num(600),
+});
+const SetBody = z.object({
+  reps: z.number().int().min(0).max(1000).nullable().default(null),
+  kg: num(1000),
+  seconds: z.number().int().min(0).max(86_400).nullable().default(null),
+  km: num(1000),
+  // Omitted = leave as is (editing a number must never untick a set).
+  done: z.boolean().optional(),
+});
+const weekdayParam = (v: string) => {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n > 6) throw new HttpError(400, 'Bad weekday');
+  return n;
+};
 
 export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: () => number, sender?: Sender) {
   const send = () => sender ?? webPushSender(db);
@@ -426,6 +457,67 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     settle(cx);
     return c.json(archiveState(cx, before));
   });
+
+  // ------------------------------------------------------------ phase 5: the gate
+  // Every Gate mutation returns both states: the Gate's and the main app's (XP, header, Today).
+  const gate = (req: any, fn?: (cx: Ctx) => unknown) => {
+    const cx = ctx(req);
+    settle(cx);
+    fn?.(cx);
+    return { gate: gateState(cx), state: fullState(cx) };
+  };
+  app.get('/api/gate', (c) => c.json(gate(c)));
+
+  app.post('/api/gate/exercises', async (c) => {
+    const b = ExerciseBody.parse(await c.req.json());
+    let id = 0;
+    const out = gate(c, (cx) => { id = createExercise(cx, b as any); });
+    return c.json({ ...out, id });
+  });
+  app.put('/api/gate/exercises/:id', async (c) => {
+    const b = ExerciseBody.parse(await c.req.json());
+    return c.json(gate(c, (cx) => updateExercise(cx, id(c.req.param('id')), b as any)));
+  });
+  app.delete('/api/gate/exercises/:id', (c) => c.json(gate(c, (cx) => archiveExercise(cx, id(c.req.param('id'))))));
+
+  app.put('/api/gate/days/:wd', async (c) => {
+    const b = z.object({ name: z.string().trim().max(40), isRest: z.boolean() }).parse(await c.req.json());
+    return c.json(gate(c, (cx) => updateDay(cx, weekdayParam(c.req.param('wd')), b)));
+  });
+  app.post('/api/gate/days/:wd/items', async (c) => {
+    const b = PlanItemBody.parse(await c.req.json());
+    return c.json(gate(c, (cx) => addPlanItem(cx, weekdayParam(c.req.param('wd')), b)));
+  });
+  app.post('/api/gate/days/:wd/reorder', async (c) => {
+    const { ids } = z.object({ ids: z.array(z.number().int()) }).parse(await c.req.json());
+    return c.json(gate(c, (cx) => reorderPlanItems(cx, weekdayParam(c.req.param('wd')), ids)));
+  });
+  app.put('/api/gate/items/:id', async (c) => {
+    const b = PlanItemBody.omit({ exerciseId: true }).parse(await c.req.json());
+    return c.json(gate(c, (cx) => updatePlanItem(cx, id(c.req.param('id')), b)));
+  });
+  app.delete('/api/gate/items/:id', (c) => c.json(gate(c, (cx) => removePlanItem(cx, id(c.req.param('id'))))));
+
+  app.post('/api/gate/session/start', (c) => c.json(gate(c, (cx) => startWorkout(cx))));
+  app.post('/api/gate/session/exercise', async (c) => {
+    const { exerciseId } = z.object({ exerciseId: z.number().int() }).parse(await c.req.json());
+    return c.json(gate(c, (cx) => addExerciseToSession(cx, exerciseId)));
+  });
+  app.post('/api/gate/session/sets', async (c) => {
+    const { exerciseId } = z.object({ exerciseId: z.number().int() }).parse(await c.req.json());
+    return c.json(gate(c, (cx) => addSet(cx, exerciseId)));
+  });
+  app.put('/api/gate/sets/:id', async (c) => {
+    const b = SetBody.parse(await c.req.json());
+    return c.json(gate(c, (cx) => updateSet(cx, id(c.req.param('id')), b)));
+  });
+  app.delete('/api/gate/sets/:id', (c) => c.json(gate(c, (cx) => removeSet(cx, id(c.req.param('id'))))));
+  app.post('/api/gate/session/finish', async (c) => {
+    const { note } = z.object({ note: z.string().max(1000).default('') }).parse(await c.req.json().catch(() => ({})));
+    return c.json(gate(c, (cx) => finishSession(cx, note)));
+  });
+  app.post('/api/gate/session/undo', (c) => c.json(gate(c, (cx) => undoFinish(cx))));
+  app.delete('/api/gate/session', (c) => c.json(gate(c, (cx) => discardSession(cx))));
 
   return app;
 }

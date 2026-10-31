@@ -1,4 +1,4 @@
-import { getSetting, seed, seedRewards, setSetting, type DB } from './db.ts';
+import { getSetting, seed, seedRewards, seedWorkoutDays, setSetting, type DB } from './db.ts';
 import { HttpError } from './game.ts';
 
 // Backup, restore and reset. Auth (password, sessions), push keys and subscriptions are never
@@ -8,10 +8,11 @@ import { HttpError } from './game.ts';
 const TABLES = [
   'profile', 'categories', 'tasks', 'habit_logs', 'xp_events', 'currency_events', 'goals', 'store_items',
   'inventory', 'lootbox_claims', 'journal', 'title_unlocks', 'weight_logs', 'focus_sessions', 'reminders_sent',
+  'exercises', 'workout_days', 'workout_plan_items', 'workout_sessions', 'workout_sets',
 ] as const;
 
 /** Settings that are game data (not credentials) and travel with a backup. */
-const DATA_SETTINGS = ['last_settled_date', 'reminders', 'last_reminder_at'];
+const DATA_SETTINGS = ['last_settled_date', 'reminders', 'last_reminder_at', 'workout_schedule_since'];
 
 export const RESET_PHRASE = 'I ACCEPT THE RESET';
 
@@ -85,6 +86,7 @@ export function resetData(db: DB, phrase: string) {
       wipe(db);
       seed(db);
       seedRewards(db);
+      seedWorkoutDays(db);
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');

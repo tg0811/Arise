@@ -35,6 +35,19 @@
   color-scheme: dark;
 }
 
+/* The Gate (workout dimension): a crimson "Red Gate" world. Same variables, different values,
+   so every component re-themes. Rank colours (--sl-rank) are untouched. */
+:root[data-dimension="gate"] {
+  --sl-bg: #0b0506;
+  --sl-panel: #1c0b0e;
+  --sl-accent: #dc2626;
+  --sl-accent2: #f97316;
+  --sl-text: #fbf4f4;
+  --sl-text2: #c9a9a9;
+  --sl-muted: #8c6a6a;
+  --sl-line: rgba(220, 38, 38, 0.22);
+}
+
 html, body, #root { min-height: 100%; }
 
 body {
@@ -71,7 +84,7 @@ body::before {
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--sl-line);
   /* System-window feel: faint inner blue glow */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 0 22px rgba(59, 130, 246, 0.06);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 0 22px color-mix(in srgb, var(--sl-accent) 6%, transparent);
 }
 
 .label {

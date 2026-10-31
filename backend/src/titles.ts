@@ -1,5 +1,6 @@
 import { HttpError, dayProgress, totalXp, type Ctx, type Task } from './game.ts';
-import { attributeLevel, isScheduled, levelFromXp, MAX_LEVEL } from '../../shared/engine.ts';
+import { GATE_TITLE_WEEKS, attributeLevel, isScheduled, levelFromXp, MAX_LEVEL } from '../../shared/engine.ts';
+import { weekStreak } from './workout.ts';
 
 // Titles (M7): earned by deterministic milestones, never by luck. Each is checked against
 // live stats on every state build; once met it is recorded in title_unlocks and kept.
@@ -16,6 +17,8 @@ export interface Milestones {
   payloadsOpened: number;
   level: number;
   attributes: { id: number; name: string; level: number }[];
+  workoutsDone: number;
+  bestWeekStreak: number;
 }
 
 interface TitleDef {
@@ -43,6 +46,10 @@ const FIXED_TITLES: TitleDef[] = [
   { key: 'reflective', name: 'The Reflective', hint: 'Write 5 after-action reviews', progress: (m) => at(m.reviews, 5) },
   { key: 'treasure_hunter', name: 'Treasure Hunter', hint: 'Open 30 daily payloads', progress: (m) => at(m.payloadsOpened, 30) },
   { key: 'shadow_monarch', name: 'Shadow Monarch', hint: `Reach level ${MAX_LEVEL}`, progress: (m) => at(m.level, MAX_LEVEL) },
+  { key: 'gatekeeper', name: 'Gatekeeper', hint: 'Finish your first workout in the Gate', progress: (m) => at(m.workoutsDone, 1) },
+  { key: 'iron_disciple', name: 'Iron Disciple', hint: `Hold a ${GATE_TITLE_WEEKS.iron}-week workout streak`, progress: (m) => at(m.bestWeekStreak, GATE_TITLE_WEEKS.iron) },
+  { key: 'dungeon_breaker', name: 'Dungeon Breaker', hint: `Hold a ${GATE_TITLE_WEEKS.breaker}-week workout streak`, progress: (m) => at(m.bestWeekStreak, GATE_TITLE_WEEKS.breaker) },
+  { key: 'centurion_of_iron', name: 'Centurion of Iron', hint: 'Finish 100 workouts', progress: (m) => at(m.workoutsDone, 100) },
 ];
 
 /** Per-category titles, so new categories get their own milestones automatically. */
@@ -106,6 +113,8 @@ export function milestones(ctx: Ctx): Milestones {
     payloadsOpened: n('SELECT COUNT(*) AS n FROM lootbox_claims'),
     level: levelFromXp(totalXp(db)).level,
     attributes,
+    workoutsDone: n("SELECT COUNT(*) AS n FROM workout_sessions WHERE status = 'done'"),
+    bestWeekStreak: weekStreak(ctx).best,
   };
 }
 

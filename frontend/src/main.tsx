@@ -1,6 +1,6 @@
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import '@fontsource/outfit/400.css';
 import '@fontsource/outfit/600.css';
@@ -23,8 +23,12 @@ import { Settings } from './pages/Settings';
 import { Rules } from './pages/Rules';
 import { Goals } from './pages/Goals';
 import { Store } from './pages/Store';
-import { Archive } from './pages/Archive';
 import { TitleWatcher } from './components/TitleWatcher';
+import { GateLayout } from './pages/gate/GateLayout';
+import { GateToday } from './pages/gate/GateToday';
+import { Plan as GatePlan } from './pages/gate/Plan';
+import { GateHistory } from './pages/gate/History';
+import { Exercises as GateExercises } from './pages/gate/Exercises';
 import { AmbientParticles } from './components/fx';
 
 const queryClient = new QueryClient({
@@ -47,11 +51,18 @@ function Game() {
       <LevelChange s={s} />
       <TitleWatcher s={s} />
       <Routes>
+        {/* The Gate: its own dimension, outside the main layout (no Arise header or nav). */}
+        <Route path="gate" element={<GateLayout />}>
+          <Route index element={<GateToday />} />
+          <Route path="plan" element={<GatePlan />} />
+          <Route path="history" element={<GateHistory />} />
+          <Route path="exercises" element={<GateExercises />} />
+        </Route>
         <Route element={<Layout s={s} />}>
           <Route index element={<Today s={s} />} />
           <Route path="goals" element={<Goals s={s} />} />
           <Route path="store" element={<Store s={s} />} />
-          <Route path="archive" element={<Archive s={s} />} />
+          <Route path="archive" element={<Navigate to="/character?tab=archive" replace />} />
           <Route path="character" element={<Character s={s} />} />
           <Route path="settings" element={<Settings s={s} />} />
           <Route path="settings/rules" element={<Rules s={s} />} />

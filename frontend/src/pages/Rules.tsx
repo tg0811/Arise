@@ -6,6 +6,7 @@ import {
   MAX_LEVEL, MOOD_TIERS, RANKS, STREAK_TIERS, WEEKLY_BOSS_SHARE, attributeLevel, creditsFor, rankForLevel,
   totalXpForLevel, weeklyBossXp, xpToNext,
   GOAL_LATE_SHARE, GOAL_SIZES, JOURNAL_AAR_XP, LOOT_GEM_STREAK_STEP, LOOT_ODDS, LOOT_STREAK_BONUS_CAP, LOOT_STREAK_BONUS_PER_DAY, lootStreakBonus,
+  GATE_TITLE_WEEKS, WORKOUT_XP,
 } from '@shared';
 import type { AppState } from '../lib/api';
 import { DIFFICULTY_STYLE, rankColor } from '../lib/theme';
@@ -219,7 +220,19 @@ export function Rules({ s }: { s: AppState }) {
         <p className="mt-2 text-xs text-muted">With no history yet, you start Steady.</p>
       </Panel>
 
-      <SectionTitle>13 · The covenant</SectionTitle>
+      <SectionTitle>13 · The Gate (workouts)</SectionTitle>
+      <Panel className="p-4">
+        <ul className="space-y-2">
+          <Rule>Plan your week in the Gate: each weekday is a workout day (with exercises) or a rest day.</Rule>
+          <Rule>Finishing a planned workout gives <b className="text-good">+{WORKOUT_XP} Body XP</b> (and credits). A planned workout not finished by midnight costs <b className="text-bad">−{WORKOUT_XP}</b>. Rest days are neutral.</Rule>
+          <Rule>Workout days count toward the daily {clear} clear, just like a task. Extra sessions on rest days are logged (PRs, history) but give no XP.</Rule>
+          <Rule><b className="text-ink">Weekly streak:</b> a week counts only if every planned workout in it was done. This week never breaks the streak until a workout is actually missed.</Rule>
+          <Rule>Records: heaviest weight, most reps, estimated 1RM (weight × (1 + reps ÷ 30)), longest distance and time.</Rule>
+          <Rule>Titles: Gatekeeper (first workout), Iron Disciple ({GATE_TITLE_WEEKS.iron}-week streak), Dungeon Breaker ({GATE_TITLE_WEEKS.breaker}-week streak), Centurion of Iron (100 workouts).</Rule>
+        </ul>
+      </Panel>
+
+      <SectionTitle>14 · The covenant</SectionTitle>
       <Panel className="p-4">
         <ul className="space-y-2">
           <Rule>Report honestly. The System only knows what you tell it. The only one you can cheat is yourself.</Rule>

@@ -3,7 +3,9 @@ import { RANKS, totalXpForLevel } from '@shared';
 import { useAction, type AppState } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
-import { CategoryIcon, Panel, ProgressBar, SectionTitle, useToast } from '../components/ui';
+import { useSearchParams } from 'react-router-dom';
+import { CategoryIcon, Panel, ProgressBar, SectionTitle, Tabs, useToast } from '../components/ui';
+import { Archive } from './Archive';
 import { rankColor } from '../lib/theme';
 
 const MOODS = {
@@ -14,7 +16,20 @@ const MOODS = {
 };
 
 /** The Mirror: who you are right now. */
+/** Character hub: Profile (who you are now) and Archive (how you got here). */
 export function Character({ s }: { s: AppState }) {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'archive' ? 'archive' : 'profile';
+  return (
+    <>
+      <Tabs<'profile' | 'archive'> value={tab} onChange={(t) => setParams(t === 'archive' ? { tab: 'archive' } : {}, { replace: true })}
+        tabs={[{ id: 'profile', label: 'Profile' }, { id: 'archive', label: 'Archive' }]} />
+      {tab === 'archive' ? <Archive s={s} /> : <Profile s={s} />}
+    </>
+  );
+}
+
+function Profile({ s }: { s: AppState }) {
   const p = s.progress;
   const mood = MOODS[s.mood];
   const MoodIcon = mood.icon;

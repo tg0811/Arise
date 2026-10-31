@@ -5,6 +5,7 @@ import { journalState } from './journal.ts';
 import { evaluateTitles } from './titles.ts';
 import { focusState } from './focus.ts';
 import { getPrefs, subscriptionCount } from './reminders.ts';
+import { todayWorkout } from './workout.ts';
 
 /** The whole app state the client renders from; every mutation returns it. */
 export function fullState(ctx: Ctx) {
@@ -20,6 +21,7 @@ export function fullState(ctx: Ctx) {
     titles,
     equippedTitle: equipped ? { key: equipped.key, name: equipped.name } : null,
     focus: focusState(ctx),
+    workoutToday: todayWorkout(ctx),
     reminders: { ...getPrefs(ctx.db), devices: subscriptionCount(ctx.db) },
   };
 }
