@@ -67,6 +67,7 @@ Built *for the owner*, fully customizable. Installed from the browser with "Add 
 6. **Deploy:** Docker + Caddy on Hetzner (`tghf-prod`, `/opt/tghf/solo-leveling`), auto Let's Encrypt on `89-167-82-104.sslip.io` until the owner buys a domain (e.g. `arise.<domain>.com`; switch = edit `DOMAIN` in `deploy/.env`, new origin so reinstall the PWA + re-enable push). Files: `Dockerfile`, `deploy/` (compose, Caddyfile, backup.sh), `deploy.sh` (rsync + rebuild). **The server DB is the live one from now on; local `data/` is a dev copy.** Never expose plain HTTP. The trading-bot service on the same box must never be touched.
 
 ## Implementation notes (non-obvious)
+- **Default password (2026-10-31, owner request):** the server starts with `INITIAL_PASSWORD` from `deploy/.env` when the DB has no password, so the open "set a password" screen is never exposed. The value stays out of git. Settings has Change password (`POST /api/password`: needs the current one, min 6, signs out all other sessions; a wrong current returns 400, not 401, because the frontend treats 401 as logged out).
 - Node runs `.ts` directly, so backend imports use `.ts` extensions and only erasable TS syntax (no enums or parameter properties). Shared code is imported by relative path (`../../shared/engine.ts`) because Node won't type-strip inside `node_modules`.
 - Custom CSS classes (`.glass`, `.field`) live in `@layer components` so Tailwind utilities can override them.
 - Form pickers use `role="group"`, not `<label>`; a label wrapping buttons makes taps on its caption toggle the first button.

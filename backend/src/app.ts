@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { DB } from './db.ts';
 import { tx } from './db.ts';
 import {
-  COOKIE, PRIVATE_UNLOCK_MINUTES, checkPassword, createSession, deleteSession, isConfigured, isValidSession,
+  COOKIE, PRIVATE_UNLOCK_MINUTES, checkPassword, createSession, deleteOtherSessions, deleteSession, isConfigured, isValidSession,
   privateUnlockedUntil, setPassword, setPrivateUnlock,
 } from './auth.ts';
 import {
@@ -213,6 +213,17 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     if (c.req.path.startsWith('/api/auth/')) return next();
     if (!isValidSession(db, getCookie(c, COOKIE))) return c.json({ error: 'Unauthorized' }, 401);
     return next();
+  });
+
+  app.post('/api/password', async (c) => {
+    const b = z.object({ current: z.string().max(200), next: z.string().min(6).max(200) }).parse(await c.req.json());
+    if (!checkPassword(db, b.current)) {
+      await new Promise((r) => setTimeout(r, 600));
+      throw new HttpError(400, 'Current password is wrong'); // not 401: that would read as "logged out"
+    }
+    setPassword(db, b.next);
+    deleteOtherSessions(db, getCookie(c, COOKIE)!);
+    return c.json({ ok: true });
   });
 
   // ------------------------------------------------------------ state & profile

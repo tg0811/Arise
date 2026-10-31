@@ -45,6 +45,11 @@ export function isValidSession(db: DB, token: string | undefined): boolean {
   return !!row && row.expires_at > new Date().toISOString();
 }
 
+/** Sign out every device except the one making the request (after a password change). */
+export function deleteOtherSessions(db: DB, keep: string) {
+  db.prepare('DELETE FROM sessions WHERE token != ?').run(keep);
+}
+
 export function deleteSession(db: DB, token: string) {
   db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }

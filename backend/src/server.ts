@@ -7,6 +7,7 @@ import { openDb } from './db.ts';
 import { createApp } from './app.ts';
 import { settle } from './game.ts';
 import { runReminders, webPushSender } from './reminders.ts';
+import { isConfigured, setPassword } from './auth.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '../..');
@@ -15,6 +16,12 @@ const port = Number(process.env.PORT ?? 8787);
 
 const db = openDb(join(dataDir, 'sololeveling.db'));
 const app = createApp(db);
+
+// A fresh install starts with this password instead of an open "set a password" screen; change it in Settings.
+if (!isConfigured(db) && process.env.INITIAL_PASSWORD) {
+  setPassword(db, process.env.INITIAL_PASSWORD);
+  console.log('Password set from INITIAL_PASSWORD');
+}
 
 // In production the backend also serves the built PWA.
 const dist = join(root, 'frontend/dist');

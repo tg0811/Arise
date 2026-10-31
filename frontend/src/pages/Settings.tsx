@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Camera, Plus, Pencil, LogOut, ScrollText, ChevronRight, Bell, BellRing, Volume2, VolumeX, Download, Upload, AlertTriangle } from 'lucide-react';
+import { Camera, Plus, Pencil, LogOut, ScrollText, ChevronRight, Bell, BellRing, Volume2, VolumeX, Download, Upload, AlertTriangle, KeyRound } from 'lucide-react';
 import { disablePush, enablePush, pushStatus, type PushStatus } from '../lib/push';
 import { setSoundEnabled, sfx, soundEnabled } from '../lib/sound';
 import { api, useAction, type AppState, type Category } from '../lib/api';
@@ -18,6 +18,7 @@ export function Settings({ s }: { s: AppState }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(s.profile.name);
   const [editingCat, setEditingCat] = useState<Category | 'new' | null>(null);
+  const [pwOpen, setPwOpen] = useState(false);
 
   const saveProfile = (body: object, msg = 'Saved') =>
     action.mutate({ method: 'PUT', path: '/profile', body }, { onSuccess: () => toast(msg, 'good'), onError: (e) => toast(e.message, 'bad') });
@@ -86,12 +87,55 @@ export function Settings({ s }: { s: AppState }) {
       <DataSection />
 
       <SectionTitle>Session</SectionTitle>
-      <Button variant="ghost" onClick={logout}><LogOut size={15} /> Log out</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ghost" onClick={() => setPwOpen(true)}><KeyRound size={15} /> Change password</Button>
+        <Button variant="ghost" onClick={logout}><LogOut size={15} /> Log out</Button>
+      </div>
+
+      <Sheet open={pwOpen} onClose={() => setPwOpen(false)} title="Change password">
+        {pwOpen && <PasswordForm onDone={() => setPwOpen(false)} />}
+      </Sheet>
 
       <Sheet open={editingCat !== null} onClose={() => setEditingCat(null)} title={editingCat === 'new' ? 'New category' : 'Edit category'}>
         {editingCat && <CategoryForm key={editingCat === 'new' ? 'new' : editingCat.id} cat={editingCat === 'new' ? null : editingCat} onDone={() => setEditingCat(null)} />}
       </Sheet>
     </div>
+  );
+}
+
+function PasswordForm({ onDone }: { onDone: () => void }) {
+  const toast = useToast();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (next !== confirm) return setError('New passwords do not match');
+    setBusy(true);
+    try {
+      await api('POST', '/password', { current, next });
+      toast('Password changed. Other devices are signed out.', 'good');
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <input type="password" className="field" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" autoFocus />
+      <input type="password" className="field" placeholder="New password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" />
+      <input type="password" className="field" placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
+      {error && <p className="text-sm font-semibold text-bad">{error}</p>}
+      <p className="text-xs text-muted">At least 6 characters. Your other devices will need to log in again.</p>
+      <Button type="submit" className="w-full" disabled={busy || !current || next.length < 6}>Change password</Button>
+    </form>
   );
 }
 

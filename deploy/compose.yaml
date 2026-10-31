@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     environment:
       TZ: UTC
+      # Only used when the database has no password yet (first start). Change it in Settings afterwards.
+      INITIAL_PASSWORD: ${INITIAL_PASSWORD:-}
     volumes:
       - ./data:/data
     # No published port: only Caddy reaches it, over the compose network.
