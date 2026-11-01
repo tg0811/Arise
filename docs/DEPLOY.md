@@ -170,4 +170,4 @@ It first runs every check (typecheck, backend tests, browser smoke test, about 3
 2. On the server, edit `/etc/nginx/sites-available/arise`: put the new name in **both** `server_name` lines, or add it next to the old one.
 3. Run `sudo nginx -t && sudo systemctl reload nginx`, then `sudo certbot --nginx -d arise.<domain>.com --redirect`.
 4. Set `DOMAIN=arise.<domain>.com` in `deploy/.env`. Only `deploy.sh`'s check uses it.
-5. A new domain is a new browser origin: open the new URL, log in, reinstall the app on the phone and turn notifications back on. All data stays, because it lives on the server.
+5. A new domain is a new browser origin: open the new URL, log in, reinstall the app on the phone, turn notifications back on, and set up the fingerprint again (Settings → App lock; passkeys belong to one domain). Remove the old passkeys from the list there. All data stays, because it lives on the server.

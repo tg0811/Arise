@@ -54,6 +54,8 @@ export interface AppState {
   /** Today's scheduled workout (null on rest days / no plan). */
   workoutToday: { name: string; done: boolean; total: number; completed: number } | null;
   reminders: ReminderPrefs & { devices: number };
+  /** App lock: on/off, and the passkeys (fingerprint/face) set up on your devices. */
+  lock: { enabled: boolean; passkeys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] };
 }
 
 export interface Title { key: string; name: string; hint: string; cur: number; target: number; unlocked: boolean; unlockedAt: string | null }
@@ -105,6 +107,8 @@ export interface JournalEntry {
   title: string; body: string; planned: string; happened: string; why: string; next: string; createdAt: string;
 }
 
+export const LOCKED_EVENT = 'arise:locked';
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -121,6 +125,8 @@ export async function api<T = AppState>(method: string, path: string, body?: unk
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
+  // 423 = this device is locked (app lock): the app swaps to the lock screen.
+  if (res.status === 423) window.dispatchEvent(new Event(LOCKED_EVENT));
   if (!res.ok) throw new ApiError(res.status, json.error ?? `Request failed (${res.status})`);
   return json as T;
 }

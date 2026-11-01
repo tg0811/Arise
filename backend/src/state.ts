@@ -6,6 +6,7 @@ import { evaluateTitles } from './titles.ts';
 import { focusState } from './focus.ts';
 import { getPrefs, subscriptionCount } from './reminders.ts';
 import { todayWorkout } from './workout.ts';
+import { lockEnabled, passkeyList } from './lock.ts';
 
 /** The whole app state the client renders from; every mutation returns it. */
 export function fullState(ctx: Ctx) {
@@ -23,5 +24,6 @@ export function fullState(ctx: Ctx) {
     focus: focusState(ctx),
     workoutToday: todayWorkout(ctx),
     reminders: { ...getPrefs(ctx.db), devices: subscriptionCount(ctx.db) },
+    lock: { enabled: lockEnabled(ctx.db), passkeys: passkeyList(ctx.db) },
   };
 }

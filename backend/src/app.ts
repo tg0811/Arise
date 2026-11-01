@@ -13,6 +13,10 @@ import {
 } from './game.ts';
 import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, isScheduled, localDate } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
+import {
+  authenticationOptions, deletePasskey, isUnlocked, lockEnabled, lockNow, registerPasskey, registrationOptions,
+  relyingParty, setLockEnabled, touchUnlock, verifyPasskey,
+} from './lock.ts';
 import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
 import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
 import { createEntry, deleteEntry, updateEntry } from './journal.ts';
@@ -195,11 +199,17 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   // ------------------------------------------------------------ auth
   const startSession = (c: any) => {
     const { token, maxAge } = createSession(db);
+    touchUnlock(db, token, clock()); // you just typed the password: this device starts unlocked
     setCookie(c, COOKIE, token, { httpOnly: true, sameSite: 'Lax', secure, path: '/', maxAge });
   };
 
-  app.get('/api/auth/status', (c) =>
-    c.json({ configured: isConfigured(db), authed: isValidSession(db, getCookie(c, COOKIE)) }));
+  app.get('/api/auth/status', (c) => {
+    const token = getCookie(c, COOKIE);
+    const authed = isValidSession(db, token);
+    const locked = authed && !isUnlocked(db, token!, clock());
+    const passkeys = locked ? (db.prepare('SELECT COUNT(*) AS n FROM passkeys').get() as { n: number }).n : 0;
+    return c.json({ configured: isConfigured(db), authed, locked, passkeys });
+  });
 
   app.post('/api/auth/setup', async (c) => {
     if (isConfigured(db)) throw new HttpError(409, 'Already set up');
@@ -228,8 +238,59 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
 
   app.use('/api/*', async (c, next) => {
     if (c.req.path.startsWith('/api/auth/')) return next();
-    if (!isValidSession(db, getCookie(c, COOKIE))) return c.json({ error: 'Unauthorized' }, 401);
+    const token = getCookie(c, COOKIE);
+    if (!isValidSession(db, token)) return c.json({ error: 'Unauthorized' }, 401);
+    // Unlock routes work on a locked device; everything else needs it unlocked, so a locked device gets no data.
+    if (c.req.path.startsWith('/api/lock/')) return next();
+    if (!isUnlocked(db, token!, clock())) return c.json({ error: 'Locked', locked: true }, 423);
+    touchUnlock(db, token!, clock());
     return next();
+  });
+
+  // ------------------------------------------------------------ app lock
+  const rp = (c: any) => relyingParty(c.req.header('origin'), c.req.header('host'));
+  const unlockPrivate = (c: any) => setPrivateUnlock(db, getCookie(c, COOKIE)!, new Date(clock().getTime() + PRIVATE_UNLOCK_MINUTES * 60_000));
+
+  app.post('/api/lock/password', async (c) => {
+    const { password } = z.object({ password: z.string().max(200) }).parse(await c.req.json());
+    if (!checkPassword(db, password)) {
+      await new Promise((r) => setTimeout(r, 600));
+      throw new HttpError(401, 'Wrong password');
+    }
+    touchUnlock(db, getCookie(c, COOKIE)!, clock());
+    return c.json({ ok: true });
+  });
+  app.post('/api/lock/passkey/options', async (c) => c.json(await authenticationOptions(db, getCookie(c, COOKIE)!, rp(c), clock())));
+  app.post('/api/lock/passkey/verify', async (c) => {
+    const b = z.object({ response: z.any(), purpose: z.enum(['app', 'private']).default('app') }).parse(await c.req.json());
+    const token = getCookie(c, COOKIE)!;
+    await verifyPasskey(db, token, rp(c), b.response, clock());
+    touchUnlock(db, token, clock());
+    if (b.purpose === 'private') unlockPrivate(c);
+    return c.json({ ok: true });
+  });
+  app.post('/api/lock/now', (c) => {
+    lockNow(db, getCookie(c, COOKIE)!);
+    return c.json({ ok: true });
+  });
+
+  // Settings (need the device unlocked)
+  app.put('/api/app-lock', async (c) => {
+    const { enabled } = z.object({ enabled: z.boolean() }).parse(await c.req.json());
+    setLockEnabled(db, enabled);
+    return c.json(state(c));
+  });
+  app.post('/api/passkeys/options', async (c) =>
+    c.json(await registrationOptions(db, getCookie(c, COOKIE)!, rp(c), getProfile(db).name, clock())));
+  app.post('/api/passkeys', async (c) => {
+    const b = z.object({ response: z.any(), name: z.string().trim().min(1).max(40) }).parse(await c.req.json());
+    await registerPasskey(db, getCookie(c, COOKIE)!, rp(c), b.response, b.name, clock());
+    setLockEnabled(db, true); // setting up a fingerprint means you want the lock
+    return c.json(state(c));
+  });
+  app.delete('/api/passkeys/:id', (c) => {
+    deletePasskey(db, c.req.param('id'));
+    return c.json(state(c));
   });
 
   app.post('/api/password', async (c) => {
@@ -450,7 +511,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
       await new Promise((r) => setTimeout(r, 600));
       throw new HttpError(401, 'Wrong password');
     }
-    setPrivateUnlock(db, getCookie(c, COOKIE)!, new Date(clock().getTime() + PRIVATE_UNLOCK_MINUTES * 60_000));
+    unlockPrivate(c);
     return c.json(state(c));
   });
   app.post('/api/private/lock', (c) => {

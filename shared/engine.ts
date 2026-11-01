@@ -301,5 +301,8 @@ export const ALL_DAYS = '0123456';
 /** A quest or goal can be removed without penalty only this long after creating it (typos, second thoughts). */
 export const FREE_REMOVE_MINUTES = 60;
 
+/** With the app lock on, a device locks after this long without any request (closed, backgrounded, asleep). */
+export const LOCK_AFTER_MINUTES = 5;
+
 /** Username shown in the header: 3–20 letters, digits, `_` or `.`. The full name stays free text. */
 export const USERNAME_RE = /^[A-Za-z0-9_.]{3,20}$/;

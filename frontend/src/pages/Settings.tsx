@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Camera, Plus, Pencil, LogOut, ScrollText, ChevronRight, Bell, BellRing, Volume2, VolumeX, Download, Upload, AlertTriangle, KeyRound } from 'lucide-react';
+import { Camera, Plus, Pencil, LogOut, ScrollText, ChevronRight, Bell, BellRing, Volume2, VolumeX, Download, Upload, AlertTriangle, KeyRound, Fingerprint, Lock, Trash2 } from 'lucide-react';
 import { disablePush, enablePush, pushStatus, type PushStatus } from '../lib/push';
 import { setSoundEnabled, sfx, soundEnabled } from '../lib/sound';
 import { api, useAction, type AppState, type Category } from '../lib/api';
 import { Avatar, resizeImage } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
-import { USERNAME_RE } from '@shared';
+import { LOCK_AFTER_MINUTES, USERNAME_RE } from '@shared';
+import { devicePasskeyId, forgetDevicePasskey, passkeysSupported, setUpPasskey } from '../lib/passkey';
 import { Button, CATEGORY_ICONS, CategoryIcon, Panel, SectionTitle, Sheet, useToast } from '../components/ui';
 
 const COLORS = ['#60a5fa', '#f87171', '#c084fc', '#facc15', '#fb923c', '#4ade80', '#22d3ee', '#f472b6', '#a3e635', '#e2e8f0'];
@@ -94,6 +95,7 @@ export function Settings({ s }: { s: AppState }) {
       </Panel>
 
       <Notifications s={s} />
+      <AppLock s={s} />
       <DataSection />
 
       <SectionTitle>Session</SectionTitle>
@@ -189,6 +191,84 @@ function CategoryForm({ cat, onDone }: { cat: Category | null; onDone: () => voi
         </Button>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- app lock
+
+function AppLock({ s }: { s: AppState }) {
+  const qc = useQueryClient();
+  const action = useAction();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const here = devicePasskeyId();
+  const hereRegistered = s.lock.passkeys.some((p) => p.id === here);
+
+  const setUp = async () => {
+    setBusy(true);
+    try {
+      qc.setQueryData(['state'], await setUpPasskey());
+      toast(`Fingerprint set up. Arise now locks after ${LOCK_AFTER_MINUTES} minutes away.`, 'good');
+    } catch (e) {
+      toast((e as Error).message, 'bad');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = (id: string, name: string) => {
+    if (!confirm(`Remove the passkey for "${name}"? That device will unlock with the password instead.`)) return;
+    action.mutate({ method: 'DELETE', path: `/passkeys/${encodeURIComponent(id)}` }, {
+      onSuccess: () => { if (id === here) forgetDevicePasskey(); toast('Passkey removed'); },
+      onError: (e) => toast(e.message, 'bad'),
+    });
+  };
+  const lockNow = async () => {
+    await api('POST', '/lock/now');
+    await qc.invalidateQueries({ queryKey: ['auth'] });
+  };
+
+  return (
+    <>
+      <SectionTitle>App lock</SectionTitle>
+      <Panel className="space-y-4 p-5">
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span className="flex items-start gap-3">
+            <Lock size={18} className={`mt-0.5 shrink-0 ${s.lock.enabled ? 'text-accent' : 'text-muted'}`} />
+            <span>
+              <span className="block font-semibold">Lock Arise</span>
+              <span className="block text-xs text-muted">Every device locks after {LOCK_AFTER_MINUTES} minutes away. Unlock with your fingerprint, or your password on devices without one.</span>
+            </span>
+          </span>
+          <input type="checkbox" checked={s.lock.enabled} className="h-4 w-4 shrink-0 accent-[var(--sl-accent)]"
+            onChange={(e) => action.mutate({ method: 'PUT', path: '/app-lock', body: { enabled: e.target.checked } }, { onError: (err) => toast(err.message, 'bad') })} />
+        </label>
+
+        <div className="border-t border-line pt-4">
+          {!passkeysSupported() ? (
+            <p className="text-xs text-muted">This browser can't use fingerprint unlock; the password works.</p>
+          ) : hereRegistered ? (
+            <p className="flex items-center gap-2 text-sm text-good"><Fingerprint size={16} /> Fingerprint unlock is set up on this device</p>
+          ) : (
+            <Button className="w-full" onClick={setUp} disabled={busy}><Fingerprint size={16} /> Set up fingerprint on this device</Button>
+          )}
+          {s.lock.passkeys.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {s.lock.passkeys.map((p) => (
+                <li key={p.id} className="flex items-center gap-2 text-sm">
+                  <Fingerprint size={14} className="text-muted" />
+                  <span className="flex-1">{p.name}{p.id === here && <span className="text-muted"> (this device)</span>}
+                    <span className="block text-xs text-muted">Added {new Date(p.createdAt).toLocaleDateString()}{p.lastUsedAt && ` · last used ${new Date(p.lastUsedAt).toLocaleDateString()}`}</span>
+                  </span>
+                  <button onClick={() => remove(p.id, p.name)} className="rounded-lg p-1.5 text-muted hover:text-bad" aria-label={`Remove passkey ${p.name}`}><Trash2 size={14} /></button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {s.lock.enabled && <Button variant="ghost" className="w-full" onClick={lockNow}><Lock size={15} /> Lock now</Button>}
+      </Panel>
+    </>
   );
 }
 

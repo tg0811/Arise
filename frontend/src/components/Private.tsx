@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Lock, LockOpen } from 'lucide-react';
-import { useAction, type AppState } from '../lib/api';
+import { Fingerprint, Lock, LockOpen } from 'lucide-react';
+import { useAction, useAppState, type AppState } from '../lib/api';
+import { passkeysSupported, unlockWithPasskey } from '../lib/passkey';
 import { Button, Sheet, useToast } from './ui';
 
 // Private habits and quests: names stay masked until this device unlocks with the password (5 minutes).
@@ -9,8 +10,25 @@ import { Button, Sheet, useToast } from './ui';
 export function UnlockSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const action = useAction();
   const toast = useToast();
+  const qc = useQueryClient();
+  const { data: s } = useAppState();
   const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
   useEffect(() => { if (open) setPassword(''); }, [open]);
+  const canFingerprint = !!s?.lock.passkeys.length && passkeysSupported();
+  const fingerprint = async () => {
+    setBusy(true);
+    try {
+      await unlockWithPasskey('private');
+      await qc.invalidateQueries({ queryKey: ['state'] });
+      toast('Private items visible for 5 minutes', 'good');
+      onClose();
+    } catch (e) {
+      toast((e as Error).message, 'bad');
+    } finally {
+      setBusy(false);
+    }
+  };
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     action.mutate({ path: '/private/unlock', body: { password } }, {
@@ -23,10 +41,13 @@ export function UnlockSheet({ open, onClose }: { open: boolean; onClose: () => v
       <form onSubmit={submit}>
         <p className="mb-4 flex items-start gap-2 text-sm text-ink2">
           <Lock size={16} className="mt-0.5 shrink-0 text-accent" />
-          Enter your password to see private habits and quests on this device for 5 minutes.
+          Enter your password (or use your fingerprint) to see private habits and quests on this device for 5 minutes.
         </p>
         <input type="password" className="field" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="current-password" />
         <Button type="submit" className="mt-4 w-full" disabled={!password || action.isPending}>Unlock</Button>
+        {canFingerprint && (
+          <Button type="button" variant="ghost" className="mt-2 w-full" onClick={fingerprint} disabled={busy}><Fingerprint size={16} /> Use fingerprint</Button>
+        )}
       </form>
     </Sheet>
   );

@@ -285,6 +285,21 @@ const MIGRATIONS: string[] = [
   `,
   // 11: a habit whose repeat days changed today stays due today (new days apply from tomorrow).
   `ALTER TABLE tasks ADD COLUMN kept_date TEXT;`,
+  `
+  -- 12: app lock. Passkeys (fingerprint/face) are login data like sessions: never part of a backup.
+  CREATE TABLE passkeys (
+    id TEXT PRIMARY KEY,             -- credential id, base64url
+    public_key TEXT NOT NULL,        -- COSE public key, base64url
+    counter INTEGER NOT NULL DEFAULT 0,
+    transports TEXT NOT NULL DEFAULT '[]',
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT
+  );
+  ALTER TABLE sessions ADD COLUMN unlocked_until TEXT;
+  -- Pending passkey challenge for this session: JSON { challenge, at }, single use.
+  ALTER TABLE sessions ADD COLUMN challenge TEXT;
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

@@ -164,6 +164,53 @@ test('character: rank ladder tags the current rank; archive tab renders', async 
   await expect(page.getByText(/History/).first()).toBeVisible();
 });
 
+test('app lock: set up a fingerprint, lock, unlock with it or the password; locked means no data', async () => {
+  // Chrome's virtual authenticator stands in for the phone's fingerprint sensor.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+
+  await page.goto('/settings');
+  await button('Set up fingerprint on this device').click();
+  await expect(page.getByText('Fingerprint unlock is set up on this device')).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: '(this device)' })).toBeVisible();
+
+  // Lock now, without the automatic prompt (the virtual sensor would answer it instantly).
+  await page.evaluate(() => localStorage.removeItem('arise-passkey'));
+  await button('Lock now').click();
+  await expect(page.getByText('UNLOCK TO ARISE')).toBeVisible();
+  expect((await page.request.get('/api/state')).status(), 'a locked device gets no data').toBe(423);
+  await page.getByRole('button', { name: 'Unlock with fingerprint' }).click();
+  await expect(page.locator('header h1')).toBeVisible();
+
+  // A device that has used its passkey prompts for it by itself when it opens locked.
+  await page.request.post('/api/lock/now');
+  await page.reload();
+  await expect(page.locator('header h1')).toBeVisible();
+
+  // Password fallback (as on a device without a fingerprint).
+  await page.request.post('/api/lock/now');
+  await page.evaluate(() => localStorage.removeItem('arise-passkey'));
+  await page.reload();
+  await expect(page.getByText('UNLOCK TO ARISE')).toBeVisible();
+  await button('Use password instead').click();
+  await page.getByPlaceholder('Password').fill('wrong');
+  await button('Unlock').click();
+  await expect(page.getByText('Wrong password')).toBeVisible();
+  await page.getByPlaceholder('Password').fill(E2E_PASSWORD);
+  await button('Unlock').click();
+  await expect(page.locator('header h1')).toBeVisible();
+
+  // Turn the lock off again for the steps that follow.
+  await page.goto('/settings');
+  const lockToggle = page.locator('label', { hasText: 'Lock Arise' }).getByRole('checkbox');
+  await lockToggle.click();
+  await expect(lockToggle).not.toBeChecked();
+  await expect(button('Lock now')).toHaveCount(0);
+});
+
 test('settings: rename, open the rules, change password, log out and back in', async () => {
   await page.goto('/settings');
   await page.getByLabel(/Username/).fill('Monarch.01');
