@@ -85,14 +85,21 @@ test('habit: create with several categories, see its days, open details, edit, c
   await expect(edited.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
 });
 
-test('quest: the quest section Add opens on the Quest tab; clearing pays XP and credits', async () => {
+test('quest: the quest section Add opens on the Quest tab; type and difficulty can be edited; clearing pays XP', async () => {
   await page.getByText('No active quests').click();
   await expect(page.getByPlaceholder('Finish the API refactor')).toBeVisible();
   await page.getByPlaceholder('Finish the API refactor').fill('Pay the electricity bill');
   await button('Accept quest').click();
   const card = page.locator('div.glass', { hasText: 'Pay the electricity bill' }).first();
+  await expect(card.getByText('+25')).toBeVisible();
+  // Editing a quest can change its type and difficulty.
+  await card.getByRole('button', { name: 'Edit', exact: true }).click();
+  await sheet().getByRole('button', { name: /^Hard/ }).click();
+  await sheet().getByRole('button', { name: 'Boss ×3' }).click();
+  await sheet().getByRole('button', { name: 'Save' }).click();
+  await expect(card.getByText('+150')).toBeVisible();
   await card.getByRole('button', { name: 'Clear', exact: true }).click();
-  await expect(card.getByText('+25 XP')).toBeVisible();
+  await expect(card.getByText('+150 XP')).toBeVisible();
 });
 
 test('private quest is masked until unlocked with the password', async () => {
@@ -106,6 +113,10 @@ test('private quest is masked until unlocked with the password', async () => {
   await page.locator('input[type=password]').fill(E2E_PASSWORD);
   await button('Unlock').click();
   await expect(page.getByText('Secret errand')).toBeVisible();
+  // The "visible" bar sits above the Daily Habits title.
+  const bar = await page.getByText(/Private items visible ·/).boundingBox();
+  const habits = await page.getByText('Daily Habits').boundingBox();
+  expect(bar!.y).toBeLessThan(habits!.y);
   await button('Lock now').click();
   await expect(page.getByText('Secret errand')).toHaveCount(0);
 });

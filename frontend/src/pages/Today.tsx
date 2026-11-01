@@ -74,6 +74,9 @@ export function Today({ s }: { s: AppState }) {
         </button>
       )}
 
+      {/* Shown while private habits and quests are revealed; it covers both sections below. */}
+      <PrivateUnlockedBar s={s} className="mt-3" />
+
       {activeGoals.length > 0 && (
         <Link to="/goals" className="glass mt-3 block rounded-2xl p-3">
           <div className="mb-1.5 flex items-center justify-between">
@@ -90,7 +93,6 @@ export function Today({ s }: { s: AppState }) {
       )}
 
       <SectionTitle right={<span className="text-xs font-bold text-muted">{todayHabits.filter((h) => h.log).length}/{todayHabits.length}</span>}>Daily Habits</SectionTitle>
-      <PrivateUnlockedBar s={s} />
       {sortedHabits.length === 0 ? (
         <EmptyHint text="No habits today. Add the disciplines you want to hold yourself to." onAdd={() => setEditing({ kind: 'new', as: 'habit' })} />
       ) : (

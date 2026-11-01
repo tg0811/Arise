@@ -33,7 +33,7 @@ export function UnlockSheet({ open, onClose }: { open: boolean; onClose: () => v
 }
 
 /** Shown while private habits are revealed: time left, and a way to hide them now. */
-export function PrivateUnlockedBar({ s }: { s: AppState }) {
+export function PrivateUnlockedBar({ s, className = '' }: { s: AppState; className?: string }) {
   const action = useAction();
   const qc = useQueryClient();
   const [now, setNow] = useState(Date.now());
@@ -53,7 +53,7 @@ export function PrivateUnlockedBar({ s }: { s: AppState }) {
   if (!until || now >= until) return null;
   const left = Math.ceil((until - now) / 1000);
   return (
-    <div className="mb-3 flex items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm">
+    <div className={`flex items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm ${className}`}>
       <LockOpen size={15} className="text-accent" />
       <span className="flex-1 text-ink2">Private items visible · <span className="tabular-nums text-ink">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</span></span>
       <button onClick={() => action.mutate({ path: '/private/lock' })} className="rounded-lg border border-line px-2.5 py-1 text-xs font-bold text-ink2 hover:text-ink">Lock now</button>

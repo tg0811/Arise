@@ -80,3 +80,36 @@ test('migration and old backups: single category_id becomes the list', async () 
   const db = openDb(':memory:');
   assert.equal((db.prepare('PRAGMA user_version').get() as any).user_version, 10);
 });
+
+test('editing a quest: type and difficulty change the stakes; Mega Boss keeps its weekly limit; chain parts follow', async () => {
+  const h = harness();
+  await h.boot();
+  const deadlineAt = new Date(Date.parse('2026-11-02T04:00:00Z') + 6 * 3600_000).toISOString();
+  const edit = (id: number, extra: object) => h.call('PUT', `/api/quests/${id}`, { title: 'Q', description: '', categoryIds: [], deadlineAt, ...extra });
+  let s = await h.call('POST', '/api/quests', { title: 'Q', categoryIds: [], difficulty: 'normal', deadlineAt, parts: [{ title: 'Q2', durationHours: 24 }] });
+  const q = s.quests[0];
+  assert.equal(q.xp, 25);
+
+  s = await edit(q.id, { difficulty: 'hard' });
+  assert.equal(s.quests[0].xp, 50, 'difficulty edit');
+  s = await edit(q.id, { boss: 'boss' });
+  assert.deepEqual([s.quests[0].boss, s.quests[0].xp], ['boss', 150], 'Hard boss ×3');
+  s = await edit(q.id, { boss: 'weekly' });
+  assert.equal(s.quests[0].boss, 'weekly');
+  assert.equal(s.weeklyBossAvailable, false, 'the edit takes this week\'s Mega Boss slot');
+  assert.equal(s.quests[0].xp, 50, 'Mega Boss XP is 25% of the next level (min 50)');
+
+  // A second quest can't also become this week's Mega Boss.
+  s = await h.call('POST', '/api/quests', { title: 'Other', categoryIds: [], difficulty: 'easy', deadlineAt });
+  const other = s.quests.find((x: any) => x.title === 'Other');
+  await assert.rejects(h.call('PUT', `/api/quests/${other.id}`, { title: 'Other', description: '', deadlineAt, boss: 'weekly' }), { status: 409 });
+
+  // Back to normal frees the slot and returns to difficulty-based XP.
+  s = await edit(q.id, { boss: 'none' });
+  assert.deepEqual([s.quests.find((x: any) => x.id === q.id).xp, s.weeklyBossAvailable], [50, true]);
+
+  // Locked chain part followed the latest stakes: it's a Hard normal quest now.
+  s = await h.call('POST', `/api/quests/${q.id}/complete`);
+  const part2 = s.quests.find((x: any) => x.title === 'Q2');
+  assert.deepEqual([part2.difficulty, part2.boss, part2.xp], ['hard', 'none', 50]);
+});

@@ -9,9 +9,9 @@ import {
 } from './auth.ts';
 import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
-  getProfile, getTask, logWeight, settle, undoHabit, undoQuest, type Ctx,
+  getProfile, getTask, logWeight, setQuestStakes, settle, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, localDate } from '../../shared/engine.ts';
+import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, localDate, type Difficulty } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
 import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
 import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
@@ -89,6 +89,9 @@ const QuestEditBody = z.object({
   ...categoryFields,
   deadlineAt: z.string().datetime(),
   private: z.boolean().optional(),
+  // Stakes: left out = unchanged.
+  difficulty: difficulty.optional(),
+  boss: z.enum(['none', 'boss', 'weekly']).optional(),
 });
 
 const GoalBody = z.object({
@@ -354,8 +357,10 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     if (q.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
     if (new Date(b.deadlineAt) <= clock()) throw new HttpError(400, 'Deadline must be in the future');
     const cats = categoriesOf(b);
+    const cx = ctx(c);
     tx(db, () => {
       db.prepare('UPDATE tasks SET title = ?, description = ?, deadline_at = ? WHERE id = ?').run(b.title, b.description, b.deadlineAt, q.id);
+      if (b.boss !== undefined || b.difficulty !== undefined) setQuestStakes(cx, q, b.boss ?? q.boss, (b.difficulty ?? q.difficulty) as Difficulty);
       // Categories apply to this quest and the chain parts still to come.
       db.prepare("UPDATE tasks SET category_id = ?, category_ids = ? WHERE id = ? OR (chain_id = ? AND chain_index > ? AND status = 'locked')")
         .run(cats[0] ?? null, JSON.stringify(cats), q.id, q.chain_id, q.chain_index);

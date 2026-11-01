@@ -123,6 +123,7 @@ export function Rules({ s }: { s: AppState }) {
             <b className="text-ink">Weekly Mega Boss:</b> worth ±{pct(WEEKLY_BOSS_SHARE)} of the XP you need for your next level, locked in when created.
             One per week (resets Monday). Right now that would be ±{weeklyBossXp(s.progress.need)} XP.
           </Rule>
+          <Rule><b className="text-ink">Changing an active quest:</b> its type and difficulty can be edited until it's resolved, and the parts of a chain still to come follow. Making it this week's Mega Boss uses the weekly slot and fixes its XP at that moment; making it Normal again frees the slot.</Rule>
           <Rule><b className="text-ink">Quest chains:</b> each part unlocks when the previous one is cleared, with its own time limit. Failing any part cancels the rest of the chain.</Rule>
         </ul>
       </Panel>
