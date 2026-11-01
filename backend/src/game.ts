@@ -39,6 +39,7 @@ export interface Profile {
   onboarded: number;
   my_state: string;
   height_cm: number | null;
+  username: string;
 }
 
 export function currentWeight(db: DB): number | null {
@@ -501,7 +502,7 @@ export function buildState(ctx: Ctx) {
     now: ctx.at.toISOString(),
     today: todayStr,
     profile: {
-      name: profile.name, avatar: profile.avatar, timezone: tz, onboarded: !!profile.onboarded, myState: JSON.parse(profile.my_state),
+      name: profile.name, username: profile.username || profile.name, avatar: profile.avatar, timezone: tz, onboarded: !!profile.onboarded, myState: JSON.parse(profile.my_state),
       heightCm: profile.height_cm, weightKg: currentWeight(db),
     },
     progress: {

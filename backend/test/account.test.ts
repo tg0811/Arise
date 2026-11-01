@@ -20,3 +20,16 @@ test('change password: needs the current one, then only the new one works and ot
   await assert.rejects(h.call('POST', '/api/auth/login', { password: 'arise123' }), { status: 401 });
   await h.call('POST', '/api/auth/login', { password: 'newpass1' });
 });
+
+test('username: separate from the full name, validated, and falls back to the name until set', async () => {
+  const h = harness();
+  let s = await h.boot();
+  assert.deepEqual([s.profile.name, s.profile.username], ['Jinwoo', 'Jinwoo'], 'unset username shows the name');
+  s = await h.call('PUT', '/api/profile', { name: 'Sung Jinwoo', username: 'shadow_monarch' });
+  assert.deepEqual([s.profile.name, s.profile.username], ['Sung Jinwoo', 'shadow_monarch']);
+  s = await h.call('PUT', '/api/profile', { name: 'Sung Jin-Woo' });
+  assert.equal(s.profile.username, 'shadow_monarch', 'changing the name keeps the username');
+  for (const bad of ['ab', 'has space', 'x'.repeat(21), 'emoji😀']) {
+    await assert.rejects(h.call('PUT', '/api/profile', { username: bad }), { status: 400 }, bad);
+  }
+});

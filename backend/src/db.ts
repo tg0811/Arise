@@ -274,6 +274,8 @@ const MIGRATIONS: string[] = [
   CREATE INDEX workout_sets_session ON workout_sets(session_id);
   CREATE INDEX workout_sets_exercise ON workout_sets(exercise_id, done);
   `,
+  // 9: username (shown in the header) next to the full name. Empty = fall back to the name.
+  `ALTER TABLE profile ADD COLUMN username TEXT NOT NULL DEFAULT '';`,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

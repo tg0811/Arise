@@ -21,7 +21,7 @@ export interface AppState {
   now: string;
   today: string;
   profile: {
-    name: string; avatar: string | null; timezone: string; onboarded: boolean; myState: Record<string, string>;
+    name: string; /** Shown in the header; falls back to the name. */ username: string; avatar: string | null; timezone: string; onboarded: boolean; myState: Record<string, string>;
     heightCm: number | null; weightKg: number | null;
   };
   progress: { totalXp: number; level: number; into: number; need: number; pct: number; maxLevel: number; rank: Rank; title: string; nextRank: { rank: Rank; title: string; minLevel: number } | null };

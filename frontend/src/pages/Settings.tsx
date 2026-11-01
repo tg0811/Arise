@@ -7,6 +7,7 @@ import { setSoundEnabled, sfx, soundEnabled } from '../lib/sound';
 import { api, useAction, type AppState, type Category } from '../lib/api';
 import { Avatar, resizeImage } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
+import { USERNAME_RE } from '@shared';
 import { Button, CATEGORY_ICONS, CategoryIcon, Panel, SectionTitle, Sheet, useToast } from '../components/ui';
 
 const COLORS = ['#60a5fa', '#f87171', '#c084fc', '#facc15', '#fb923c', '#4ade80', '#22d3ee', '#f472b6', '#a3e635', '#e2e8f0'];
@@ -17,6 +18,9 @@ export function Settings({ s }: { s: AppState }) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(s.profile.name);
+  const [username, setUsername] = useState(s.profile.username);
+  const identityChanged = name.trim() !== s.profile.name || username.trim() !== s.profile.username;
+  const usernameOk = USERNAME_RE.test(username.trim());
   const [editingCat, setEditingCat] = useState<Category | 'new' | null>(null);
   const [pwOpen, setPwOpen] = useState(false);
 
@@ -49,10 +53,16 @@ export function Settings({ s }: { s: AppState }) {
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden"
             onChange={async (e) => { const f = e.target.files?.[0]; if (f) saveProfile({ avatar: await resizeImage(f) }, 'Photo updated'); }} />
-          <div className="flex-1 space-y-2">
-            <input className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
+          <div className="min-w-0 flex-1 space-y-2">
+            <label className="block"><span className="label mb-1 block">Full name</span>
+              <input className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoComplete="name" />
+            </label>
+            <label className="block"><span className="label mb-1 block">Username <span className="normal-case tracking-normal text-muted">(shown in the header)</span></span>
+              <input className="field" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={20} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+            </label>
+            {!usernameOk && <p className="text-xs text-bad">3–20 letters, digits, _ or .</p>}
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={() => saveProfile({ name })} disabled={!name.trim() || name === s.profile.name}>Save name</Button>
+              <Button className="flex-1" onClick={() => saveProfile({ name: name.trim(), username: username.trim() })} disabled={!name.trim() || !usernameOk || !identityChanged}>Save</Button>
               {s.profile.avatar && <Button variant="ghost" onClick={() => saveProfile({ avatar: null }, 'Photo removed')}>Remove photo</Button>}
             </div>
           </div>

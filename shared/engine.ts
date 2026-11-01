@@ -297,3 +297,6 @@ export function weekStart(date: string): string {
 export const isScheduled = (days: string, date: string) => days.includes(String(weekday(date)));
 
 export const ALL_DAYS = '0123456';
+
+/** Username shown in the header: 3–20 letters, digits, `_` or `.`. The full name stays free text. */
+export const USERNAME_RE = /^[A-Za-z0-9_.]{3,20}$/;

@@ -15,7 +15,7 @@ export function Header({ s }: { s: AppState }) {
         <Avatar src={s.profile.avatar} name={s.profile.name} rank={p.rank} size={44} level={p.level} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-lg font-black tracking-tight">{s.profile.name}</h1>
+            <h1 className="truncate text-lg font-black tracking-tight">{s.profile.username}</h1>
             {s.equippedTitle && <span className="hidden truncate text-xs italic text-ink2 min-[400px]:inline">« {s.equippedTitle.name} »</span>}
             {s.streak.current > 0 && (
               <span className="pulse-glow flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-xs font-bold text-gold" title="Daily streak">

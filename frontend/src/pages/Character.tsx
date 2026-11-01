@@ -40,6 +40,7 @@ function Profile({ s }: { s: AppState }) {
       <Panel className="mt-3 flex flex-col items-center p-6 text-center">
         <Avatar src={s.profile.avatar} name={s.profile.name} rank={p.rank} size={120} />
         <h2 className="mt-3 text-2xl font-black">{s.profile.name}</h2>
+        {s.profile.username !== s.profile.name && <p className="text-sm text-muted">@{s.profile.username}</p>}
         <p className="font-display text-base font-bold tracking-[0.2em] text-rank">{p.title.toUpperCase()}</p>
         {s.equippedTitle && <p className="mt-1 text-sm italic text-ink2">« {s.equippedTitle.name} »</p>}
         <div className="mt-2"><BodyStats s={s} /></div>

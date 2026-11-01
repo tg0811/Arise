@@ -11,7 +11,7 @@ import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
   getProfile, getTask, logWeight, settle, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, localDate } from '../../shared/engine.ts';
+import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, localDate } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
 import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
 import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
@@ -36,6 +36,7 @@ const id = (v: string) => {
 
 const ProfileBody = z.object({
   name: z.string().trim().min(1).max(40).optional(),
+  username: z.string().trim().regex(USERNAME_RE, 'Username: 3–20 letters, digits, _ or .').optional(),
   avatar: z.string().max(400_000).nullable().optional(),
   timezone: z.string().refine((tz) => { try { localDate(tz); return true; } catch { return false; } }, 'Unknown timezone').optional(),
   onboarded: z.boolean().optional(),
@@ -233,8 +234,9 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const b = ProfileBody.parse(await c.req.json());
     const cur = getProfile(db);
     tx(db, () => {
-      db.prepare('UPDATE profile SET name = ?, avatar = ?, timezone = ?, onboarded = ?, my_state = ?, height_cm = ? WHERE id = 1').run(
+      db.prepare('UPDATE profile SET name = ?, username = ?, avatar = ?, timezone = ?, onboarded = ?, my_state = ?, height_cm = ? WHERE id = 1').run(
         b.name ?? cur.name,
+        b.username ?? cur.username,
         b.avatar !== undefined ? b.avatar : cur.avatar,
         b.timezone ?? cur.timezone,
         b.onboarded !== undefined ? (b.onboarded ? 1 : 0) : cur.onboarded,

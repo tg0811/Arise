@@ -4,6 +4,7 @@ import { Camera } from 'lucide-react';
 import { useAction } from '../lib/api';
 import { Avatar, resizeImage } from '../components/Avatar';
 import { Button, useToast } from '../components/ui';
+import { USERNAME_RE } from '@shared';
 
 // THE-SYSTEM's cinematic onboarding: detect → identify → face → covenant.
 type Step = 'detect' | 'name' | 'photo' | 'body' | 'covenant';
@@ -38,6 +39,8 @@ function Typewriter({ text, delay = 0, className = '' }: { text: string; delay?:
 export function Awakening() {
   const [step, setStep] = useState<Step>('detect');
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const usernameOk = USERNAME_RE.test(username.trim());
   const [avatar, setAvatar] = useState<string | null>(null);
   const [height, setHeight] = useState('167');
   const [weight, setWeight] = useState('75');
@@ -50,7 +53,7 @@ export function Awakening() {
       {
         method: 'PUT', path: '/profile',
         body: {
-          name: name.trim(), avatar, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, onboarded: true,
+          name: name.trim(), username: username.trim(), avatar, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, onboarded: true,
           heightCm: Number(height) || null, ...(Number(weight) ? { weightKg: Number(weight) } : {}),
         },
       },
@@ -71,10 +74,13 @@ export function Awakening() {
           )}
 
           {step === 'name' && (
-            <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) setStep('photo'); }}>
+            <form onSubmit={(e) => { e.preventDefault(); if (name.trim() && usernameOk) setStep('photo'); }}>
               <Line className="mb-8 font-display text-2xl font-bold tracking-wider">IDENTIFY YOURSELF.</Line>
-              <input className="field text-center text-lg font-bold" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={40} autoFocus />
-              <Button type="submit" className="mt-6 w-full" disabled={!name.trim()}>Confirm</Button>
+              <input className="field text-center text-lg font-bold" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" maxLength={40} autoFocus autoComplete="name" />
+              <input className="field mt-3 text-center" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" maxLength={20}
+                autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+              <p className={`mt-2 text-xs ${username && !usernameOk ? 'text-bad' : 'text-muted'}`}>Username: 3–20 letters, digits, _ or .</p>
+              <Button type="submit" className="mt-6 w-full" disabled={!name.trim() || !usernameOk}>Confirm</Button>
             </form>
           )}
 
