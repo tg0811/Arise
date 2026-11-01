@@ -232,7 +232,7 @@ function Notifications({ s }: { s: AppState }) {
     action.mutate({ method: 'PUT', path: '/reminders', body: prefs }, { onError: (e) => toast(e.message, 'bad') });
   };
 
-  // TEMPORARY (owner request 2026-10-31): manual test button while notifications are being tried out.
+  // Manual test send. Kept permanently at the owner's request (2026-11-01), after push was verified on the phone.
   const test = async () => {
     try {
       await api('POST', '/push/test');
