@@ -17,7 +17,7 @@ import { Panel, SectionTitle } from '../components/ui';
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const SAMPLE_LEVELS = [1, 2, 5, 10, 16, 17, 25, 33, 34, 50, 51, 67, 68, 84, 85, 99, 100];
-const SAMPLE_ATTR_LEVELS = [2, 3, 5, 10, 20, 30];
+const SAMPLE_ATTR_LEVELS = [2, 5, 10, 25, 50, 100];
 
 function Table({ head, rows, highlight }: { head: string[]; rows: ReactNode[][]; highlight?: number }) {
   return (
@@ -198,9 +198,12 @@ export function Rules({ s }: { s: AppState }) {
       <SectionTitle>11 · Attributes</SectionTitle>
       <Panel className="p-4">
         <ul className="mb-3 space-y-2">
-          <Rule>Each category is an attribute. It holds the <b className="text-ink">net XP</b> of its tasks: completions raise it, fails lower it (never below 0).</Rule>
+          <Rule><b className="text-ink">Two separate counters, fed by the same XP.</b> Your <b className="text-ink">level and rank</b> count every gain and loss once, whatever its category (uncategorised tasks too). Each <b className="text-ink">category</b> ({s.categories.map((c) => c.name).join(', ')}) is an attribute with its own XP total.</Rule>
+          <Rule>An attribute holds the <b className="text-ink">net XP</b> of its tasks: completions raise it, fails lower it (never below 0). Uncategorised tasks only count toward your level.</Rule>
           <Rule>A task with <b className="text-ink">several categories</b> gives each of them the <b className="text-ink">full XP</b>, and a fail costs each the same. Your level still counts it once: Japa Meditation (Hard) in Mind, Body, Soul and Intellect is +50 to each attribute but +50 level XP.</Rule>
-          <Rule>Attribute level L is reached at {ATTR_SCALE} × (L−1)² XP.</Rule>
+          <Rule>Some XP goes to an attribute by itself: dungeon workouts train <b className="text-ink">Body</b>, after-action reviews train <b className="text-ink">Mind</b>, and a focus session trains the category you pick for it.</Rule>
+          <Rule>Attribute level L is reached at {ATTR_SCALE} × (L−1)² XP. Unlike your level, attributes have <b className="text-ink">no cap</b>, and their curve flattens, so they keep climbing steadily.</Rule>
+          <Rule>Attributes don't change your level or rank. They show the <b className="text-ink">shape</b> of your growth: three years of only Body would put Body past level 100 while Soul stays at 1, with the same overall level as a balanced player. They also earn titles: <b className="text-ink">Adept</b> at attribute level 10 and <b className="text-ink">Master</b> at 25, for every category.</Rule>
         </ul>
         <Table
           head={['Attribute level', 'XP needed']}
