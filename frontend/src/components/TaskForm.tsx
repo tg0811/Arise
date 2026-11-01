@@ -25,19 +25,38 @@ export const Field = ({ label, children }: { label: string; children: ReactNode 
   </div>
 );
 
+function CategoryToggle({ c, on, onClick }: { c: AppState['categories'][number]; on: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={on}
+      className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition"
+      style={{ color: on ? '#fff' : c.color, borderColor: `color-mix(in srgb, ${c.color} ${on ? 90 : 35}%, transparent)`, background: on ? `color-mix(in srgb, ${c.color} 35%, transparent)` : 'transparent' }}>
+      <CategoryIcon name={c.icon} size={12} /> {c.name}
+    </button>
+  );
+}
+
+/** One category (or none): tap to pick, tap again to clear. */
 export function CategoryPicker({ s, value, onChange }: { s: AppState; value: number | null; onChange: (v: number | null) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {s.categories.map((c) => {
-        const on = value === c.id;
-        return (
-          <button key={c.id} type="button" onClick={() => onChange(on ? null : c.id)}
-            className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition"
-            style={{ color: on ? '#fff' : c.color, borderColor: `color-mix(in srgb, ${c.color} ${on ? 90 : 35}%, transparent)`, background: on ? `color-mix(in srgb, ${c.color} 35%, transparent)` : 'transparent' }}>
-            <CategoryIcon name={c.icon} size={12} /> {c.name}
-          </button>
-        );
-      })}
+      {s.categories.map((c) => <CategoryToggle key={c.id} c={c} on={value === c.id} onClick={() => onChange(value === c.id ? null : c.id)} />)}
+    </div>
+  );
+}
+
+/** Any number of categories: tap to add, tap again to remove. Each one gets the full XP. */
+export function CategoriesPicker({ s, value, onChange }: { s: AppState; value: number[]; onChange: (v: number[]) => void }) {
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5">
+        {s.categories.map((c) => {
+          const on = value.includes(c.id);
+          return <CategoryToggle key={c.id} c={c} on={on} onClick={() => onChange(on ? value.filter((x) => x !== c.id) : [...value, c.id])} />;
+        })}
+      </div>
+      <p className="mt-1.5 text-xs text-muted">
+        {value.length > 1 ? `Trains ${value.length} attributes: each gets the full XP.` : 'Tap to add or remove. Pick several if it trains more than one.'}
+      </p>
     </div>
   );
 }
@@ -73,7 +92,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   const src = editingHabit ?? editingQuest;
   const [title, setTitle] = useState(src?.title ?? '');
   const [description, setDescription] = useState(src?.description ?? '');
-  const [categoryId, setCategoryId] = useState<number | null>(src?.categoryId ?? null);
+  const [categoryIds, setCategoryIds] = useState<number[]>(src?.categoryIds ?? []);
   const [difficulty, setDifficulty] = useState<Difficulty>(src?.difficulty ?? 'normal');
   // habit
   const [days, setDays] = useState(editingHabit?.days ?? '0123456');
@@ -89,15 +108,15 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
     const done = { onSuccess: () => { toast('Saved', 'good'); onDone(); }, onError: (e: Error) => toast(e.message, 'bad') };
     if (kind === 'habit') {
       if (!days) return toast('Pick at least one day', 'bad');
-      const body = { title, description, categoryId, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate };
+      const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate };
       action.mutate(editingHabit ? { method: 'PUT', path: `/habits/${editingHabit.id}`, body } : { path: '/habits', body }, done);
     } else {
       const deadlineAt = new Date(deadline).toISOString();
       if (editingQuest) {
-        action.mutate({ method: 'PUT', path: `/quests/${editingQuest.id}`, body: { title, description, categoryId, deadlineAt, private: isPrivate } }, done);
+        action.mutate({ method: 'PUT', path: `/quests/${editingQuest.id}`, body: { title, description, categoryIds, deadlineAt, private: isPrivate } }, done);
       } else {
         const cleanParts = parts.filter((p) => p.title.trim()).map((p) => ({ ...p, description: '' }));
-        action.mutate({ path: '/quests', body: { title, description, categoryId, difficulty, deadlineAt, boss, private: isPrivate, parts: cleanParts } }, done);
+        action.mutate({ path: '/quests', body: { title, description, categoryIds, difficulty, deadlineAt, boss, private: isPrivate, parts: cleanParts } }, done);
       }
     }
   };
@@ -133,8 +152,8 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
       <Field label="Description (optional)">
         <textarea className="field min-h-[60px] resize-y" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
       </Field>
-      <Field label="Category">
-        <CategoryPicker s={s} value={categoryId} onChange={setCategoryId} />
+      <Field label="Categories">
+        <CategoriesPicker s={s} value={categoryIds} onChange={setCategoryIds} />
       </Field>
       {!editingQuest && (
         <Field label={`Difficulty — XP gained / lost${kind === 'quest' && boss === 'boss' ? ` (×${BOSS_MULTIPLIER} boss)` : ''}`}>

@@ -37,7 +37,8 @@ export function maskTask(ctx: Ctx, t: Task) {
   const masked = !!t.private && !ctx.reveal;
   return {
     id: t.id, title: masked ? PRIVATE_MASK : t.title, description: masked ? '' : t.description,
-    categoryId: masked ? null : t.category_id, difficulty: t.difficulty, private: !!t.private, masked,
+    categoryId: masked ? null : t.category_id, categoryIds: masked ? [] : catIds(t),
+    difficulty: t.difficulty, private: !!t.private, masked,
   };
 }
 
@@ -68,6 +69,8 @@ export interface Task {
   title: string;
   description: string;
   category_id: number | null;
+  /** JSON array of category ids; category_id is its first entry. */
+  category_ids: string;
   difficulty: Difficulty;
   days: string;
   deadline_time: string | null;
@@ -107,9 +110,23 @@ export function getTask(db: DB, id: number): Task {
   return t;
 }
 
-export function addXp(ctx: Ctx, date: string, amount: number, categoryId: number | null, source: string, sourceId: number | null, note = '') {
-  ctx.db.prepare('INSERT INTO xp_events (at, date, amount, category_id, source, source_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(ctx.at.toISOString(), date, amount, categoryId, source, sourceId, note);
+/** Categories of a task, goal or XP event row. */
+export const catIds = (row: { category_ids: string }): number[] => JSON.parse(row.category_ids);
+
+/** One XP event: counts once toward your level, and in full toward every category it names. */
+export function addXp(ctx: Ctx, date: string, amount: number, categories: number[] | number | null, source: string, sourceId: number | null, note = '') {
+  const categoryIds = Array.isArray(categories) ? categories : categories === null ? [] : [categories];
+  ctx.db.prepare('INSERT INTO xp_events (at, date, amount, category_id, category_ids, source, source_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(ctx.at.toISOString(), date, amount, categoryIds[0] ?? null, JSON.stringify(categoryIds), source, sourceId, note);
+}
+
+/** Each category's XP: its own floored ledger over every event that names it. */
+export function attributeXp(db: DB): Map<number, number> {
+  const totals = new Map<number, number>();
+  for (const e of db.prepare("SELECT amount, category_ids FROM xp_events WHERE category_ids != '[]' ORDER BY id").all() as { amount: number; category_ids: string }[]) {
+    for (const c of catIds(e)) totals.set(c, Math.max(0, (totals.get(c) ?? 0) + e.amount));
+  }
+  return totals;
 }
 
 export function addCurrency(ctx: Ctx, date: string, currency: 'credits' | 'gems', amount: number, source: string, sourceId: number | null, note = '') {
@@ -158,7 +175,7 @@ function insertHabitLog(ctx: Ctx, habit: Task, date: string, status: 'done' | 'f
     .run(habit.id, date, status, xp, auto ? 1 : 0, ctx.at.toISOString());
   const logId = Number(res.lastInsertRowid);
   const note = `${status === 'done' ? 'Completed' : auto ? 'Missed' : 'Failed'}: ${habit.title}`;
-  addXp(ctx, date, xp, habit.category_id, 'habit', logId, note);
+  addXp(ctx, date, xp, catIds(habit), 'habit', logId, note);
   if (status === 'done') addCurrency(ctx, date, 'credits', creditsFor(DIFFICULTY_XP[habit.difficulty]), 'habit', logId, note);
 }
 
@@ -205,7 +222,7 @@ export const questXp = (q: Pick<Task, 'xp_value' | 'difficulty' | 'boss'>) =>
 export interface NewQuest {
   title: string;
   description: string;
-  categoryId: number | null;
+  categoryIds: number[];
   difficulty: Difficulty;
   deadlineAt: string;
   boss: 'none' | 'boss' | 'weekly';
@@ -234,14 +251,16 @@ export function createQuest(ctx: Ctx, q: NewQuest): number {
     const chainId = q.parts.length ? randomBytes(6).toString('hex') : null;
     const total = q.parts.length + 1;
     const ins = ctx.db.prepare(`INSERT INTO tasks
-      (kind, title, description, category_id, difficulty, status, deadline_at, chain_id, chain_index, chain_total, duration_hours, boss, xp_value, private, created_at, created_date)
-      VALUES ('quest', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (kind, title, description, category_id, category_ids, difficulty, status, deadline_at, chain_id, chain_index, chain_total, duration_hours, boss, xp_value, private, created_at, created_date)
+      VALUES ('quest', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const cat = q.categoryIds[0] ?? null;
+    const cats = JSON.stringify(q.categoryIds);
     const priv = q.private ? 1 : 0;
-    const first = ins.run(q.title, q.description, q.categoryId, q.difficulty, 'pending', q.deadlineAt,
+    const first = ins.run(q.title, q.description, cat, cats, q.difficulty, 'pending', q.deadlineAt,
       chainId, chainId ? 1 : null, chainId ? total : null, null, q.boss, xpValue, priv, ctx.at.toISOString(), date);
     // Later parts inherit category/difficulty/boss-ness of the chain.
     q.parts.forEach((p, i) => {
-      ins.run(p.title, p.description, q.categoryId, q.difficulty, 'locked', null,
+      ins.run(p.title, p.description, cat, cats, q.difficulty, 'locked', null,
         chainId, i + 2, total, p.durationHours, q.boss === 'weekly' ? 'none' : q.boss, null, priv, ctx.at.toISOString(), date);
     });
     return Number(first.lastInsertRowid);
@@ -266,7 +285,7 @@ export function completeQuest(ctx: Ctx, id: number) {
     const date = today(ctx);
     const xp = questXp(q);
     ctx.db.prepare("UPDATE tasks SET status = 'done', completed_at = ? WHERE id = ?").run(ctx.at.toISOString(), id);
-    addXp(ctx, date, xp, q.category_id, 'quest', id, `Quest cleared: ${q.title}`);
+    addXp(ctx, date, xp, catIds(q), 'quest', id, `Quest cleared: ${q.title}`);
     addCurrency(ctx, date, 'credits', creditsFor(xp), 'quest', id, `Quest cleared: ${q.title}`);
     const next = nextChainPart(ctx.db, q);
     if (next && next.status === 'locked') {
@@ -281,7 +300,7 @@ function failQuestInner(ctx: Ctx, q: Task, auto: boolean) {
   // A missed deadline is charged to the day it was due; a give-up to today.
   const date = auto && q.deadline_at ? localDate(tz, new Date(q.deadline_at)) : localDate(tz, ctx.at);
   ctx.db.prepare("UPDATE tasks SET status = 'failed', completed_at = ? WHERE id = ?").run(ctx.at.toISOString(), q.id);
-  addXp(ctx, date, -questXp(q), q.category_id, 'quest', q.id, `${auto ? 'Quest expired' : 'Quest abandoned'}: ${q.title}`);
+  addXp(ctx, date, -questXp(q), catIds(q), 'quest', q.id, `${auto ? 'Quest expired' : 'Quest abandoned'}: ${q.title}`);
   if (q.chain_id) {
     ctx.db.prepare("UPDATE tasks SET status = 'cancelled' WHERE chain_id = ? AND chain_index > ? AND status = 'locked'").run(q.chain_id, q.chain_index);
   }
@@ -346,10 +365,10 @@ export function settle(ctx: Ctx) {
     for (const q of expired) failQuestInner(ctx, q, true);
 
     // Major goals past their deadline pay the penalty once and stay on the board.
-    const lateGoals = ctx.db.prepare("SELECT id, title, xp, category_id, deadline_at FROM goals WHERE status = 'active' AND past_due = 0 AND deadline_at <= ?")
-      .all(ctx.at.toISOString()) as { id: number; title: string; xp: number; category_id: number | null; deadline_at: string }[];
+    const lateGoals = ctx.db.prepare("SELECT id, title, xp, category_ids, deadline_at FROM goals WHERE status = 'active' AND past_due = 0 AND deadline_at <= ?")
+      .all(ctx.at.toISOString()) as { id: number; title: string; xp: number; category_ids: string; deadline_at: string }[];
     for (const g of lateGoals) {
-      addXp(ctx, localDate(profile.timezone, new Date(g.deadline_at)), -g.xp, g.category_id, 'goal_penalty', g.id, `Goal deadline missed: ${g.title}`);
+      addXp(ctx, localDate(profile.timezone, new Date(g.deadline_at)), -g.xp, catIds(g), 'goal_penalty', g.id, `Goal deadline missed: ${g.title}`);
       ctx.db.prepare('UPDATE goals SET past_due = 1 WHERE id = ?').run(g.id);
     }
 
@@ -459,9 +478,7 @@ export function buildState(ctx: Ctx) {
   const nr = nextRank(rank.rank);
 
   // Attributes: each category's own floored ledger.
-  const evs = db.prepare('SELECT amount, category_id FROM xp_events WHERE category_id IS NOT NULL ORDER BY id').all() as { amount: number; category_id: number }[];
-  const catTotals = new Map<number, number>();
-  for (const e of evs) catTotals.set(e.category_id, Math.max(0, (catTotals.get(e.category_id) ?? 0) + e.amount));
+  const catTotals = attributeXp(db);
   const categories = (db.prepare('SELECT * FROM categories WHERE archived = 0 ORDER BY sort, id').all() as any[]).map((c) => {
     const cxp = catTotals.get(c.id) ?? 0;
     return { id: c.id, name: c.name, color: c.color, icon: c.icon, sort: c.sort, xp: cxp, ...attributeLevel(cxp) };

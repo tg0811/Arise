@@ -64,7 +64,7 @@ export function Rules({ s }: { s: AppState }) {
         <ul className="space-y-2">
           <Rule><b className="text-ink">Habits</b> repeat on the weekdays you choose. Each day they're scheduled, you report <b className="text-good">Complete</b> or <b className="text-bad">Fail</b>.</Rule>
           <Rule><b className="text-ink">Quests</b> are one-off missions with a deadline date and time. Clear them before the countdown hits zero.</Rule>
-          <Rule>Every task belongs to a <b className="text-ink">category</b> ({s.categories.map((c) => c.name).join(', ')}). Its XP also trains that category's attribute.</Rule>
+          <Rule>Habits, quests and goals can belong to <b className="text-ink">one or more categories</b> ({s.categories.map((c) => c.name).join(', ')}), or none. Their XP also trains those categories' attributes.</Rule>
         </ul>
       </Panel>
 
@@ -195,6 +195,7 @@ export function Rules({ s }: { s: AppState }) {
       <Panel className="p-4">
         <ul className="mb-3 space-y-2">
           <Rule>Each category is an attribute. It holds the <b className="text-ink">net XP</b> of its tasks: completions raise it, fails lower it (never below 0).</Rule>
+          <Rule>A task with <b className="text-ink">several categories</b> gives each of them the <b className="text-ink">full XP</b>, and a fail costs each the same. Your level still counts it once: Japa Meditation (Hard) in Mind, Body, Soul and Intellect is +50 to each attribute but +50 level XP.</Rule>
           <Rule>Attribute level L is reached at {ATTR_SCALE} × (L−1)² XP.</Rule>
         </ul>
         <Table

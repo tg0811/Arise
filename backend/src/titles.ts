@@ -1,4 +1,4 @@
-import { HttpError, dayProgress, totalXp, type Ctx, type Task } from './game.ts';
+import { HttpError, attributeXp, dayProgress, totalXp, type Ctx, type Task } from './game.ts';
 import { GATE_TITLE_WEEKS, attributeLevel, isScheduled, levelFromXp, MAX_LEVEL } from '../../shared/engine.ts';
 import { weekStreak } from './workout.ts';
 
@@ -93,10 +93,7 @@ export function milestones(ctx: Ctx): Milestones {
   for (const l of logs) byHabit.set(l.task_id, [...(byHabit.get(l.task_id) ?? []), l]);
   const bestHabitStreak = Math.max(0, ...habits.map((h) => habitBestStreak(h, byHabit.get(h.id) ?? [])));
 
-  const catXp = new Map<number, number>();
-  for (const e of db.prepare('SELECT amount, category_id FROM xp_events WHERE category_id IS NOT NULL ORDER BY id').all() as { amount: number; category_id: number }[]) {
-    catXp.set(e.category_id, Math.max(0, (catXp.get(e.category_id) ?? 0) + e.amount));
-  }
+  const catXp = attributeXp(db);
   const attributes = (db.prepare('SELECT id, name FROM categories WHERE archived = 0').all() as { id: number; name: string }[])
     .map((c) => ({ id: c.id, name: c.name, level: attributeLevel(catXp.get(c.id) ?? 0).level }));
 

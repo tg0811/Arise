@@ -12,7 +12,12 @@ import { Countdown } from './Countdown';
 import { Button } from './ui';
 import { daysLabel } from '../lib/time';
 
-function CategoryChip({ s, id }: { s: AppState; id: number | null }) {
+/** One chip per category, in the order they were picked. */
+function CategoryChips({ s, ids }: { s: AppState; ids: number[] }) {
+  return <>{ids.map((id) => <CategoryChip key={id} s={s} id={id} />)}</>;
+}
+
+function CategoryChip({ s, id }: { s: AppState; id: number }) {
   const c = s.categories.find((x) => x.id === id);
   if (!c) return null;
   return (
@@ -81,7 +86,7 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
-              <CategoryChip s={s} id={h.categoryId} />
+              <CategoryChips s={s} ids={h.categoryIds} />
               <DifficultyChip d={h.difficulty} />
               {h.streak > 0 && (
                 <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-gold"><Flame size={11} />{h.streak}</span>
@@ -166,7 +171,7 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
             <div className="flex flex-wrap items-center gap-1.5">
               {q.boss === 'weekly' && <span className="inline-flex items-center gap-1 rounded-md bg-accent/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-accent"><Crown size={11} /> Weekly Mega Boss</span>}
               {q.boss === 'boss' && <span className="inline-flex items-center gap-1 rounded-md bg-bad/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-bad"><Skull size={11} /> Boss</span>}
-              <CategoryChip s={s} id={q.categoryId} />
+              <CategoryChips s={s} ids={q.categoryIds} />
               <DifficultyChip d={q.difficulty} />
               {q.chain && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-ink2"><Link2 size={11} /> Part {q.chain.index}/{q.chain.total}</span>}
             </div>
@@ -246,7 +251,7 @@ export function TaskDetail({ s, task, onEdit }: { s: AppState; task: { kind: 'ha
       <div className="flex flex-wrap items-center gap-1.5">
         {task.kind === 'quest' && task.q.boss === 'weekly' && <span className="inline-flex items-center gap-1 rounded-md bg-accent/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-accent"><Crown size={11} /> Weekly Mega Boss</span>}
         {task.kind === 'quest' && task.q.boss === 'boss' && <span className="inline-flex items-center gap-1 rounded-md bg-bad/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-bad"><Skull size={11} /> Boss</span>}
-        <CategoryChip s={s} id={t.categoryId} />
+        <CategoryChips s={s} ids={t.categoryIds} />
         <DifficultyChip d={t.difficulty} />
         {t.private && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-accent"><LockOpen size={11} /> Private</span>}
       </div>

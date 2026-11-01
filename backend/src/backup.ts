@@ -1,4 +1,4 @@
-import { getSetting, seed, seedRewards, seedWorkoutDays, setSetting, type DB } from './db.ts';
+import { backfillCategoryIds, getSetting, seed, seedRewards, seedWorkoutDays, setSetting, type DB } from './db.ts';
 import { HttpError } from './game.ts';
 
 // Backup, restore and reset. Auth (password, sessions), push keys and subscriptions are never
@@ -66,6 +66,7 @@ export function restoreData(db: DB, data: any) {
         }
       }
       for (const [k, v] of Object.entries(data.settings ?? {})) if (DATA_SETTINGS.includes(k)) setSetting(db, k, String(v));
+      backfillCategoryIds(db); // backups from before multi-category only have category_id
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');

@@ -53,12 +53,20 @@ test('awakening needs a full name and a valid username', async () => {
   await expect(page.locator('header h1')).toHaveText('shadow_monarch');
 });
 
-test('habit: create, see its days, open details, edit, complete and undo', async () => {
+test('habit: create with several categories, see its days, open details, edit, complete and undo', async () => {
   await page.getByLabel('Add', { exact: true }).click();
   await page.getByPlaceholder('Sleep by 22:30').fill('Read 20 pages');
+  // Several categories: tap to add, tap again to remove.
+  for (const c of ['Mind', 'Soul', 'Intellect']) await sheet().getByRole('button', { name: c, exact: true }).click();
+  await sheet().getByRole('button', { name: 'Intellect', exact: true }).click();
+  await expect(sheet().getByRole('button', { name: 'Intellect', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(sheet().getByText('Trains 2 attributes')).toBeVisible();
   await button('Create habit').click();
   const card = page.locator('div.glass', { hasText: 'Read 20 pages' }).first();
   await expect(card.getByText('Every day')).toBeVisible();
+  await expect(card.getByText('Mind', { exact: true })).toBeVisible();
+  await expect(card.getByText('Soul', { exact: true })).toBeVisible();
+  await expect(card.getByText('Intellect', { exact: true })).toHaveCount(0);
 
   await card.getByRole('button', { name: 'Read 20 pages' }).click();
   await expect(sheetTitle()).toHaveText('Habit');

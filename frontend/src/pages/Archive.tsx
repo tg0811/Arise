@@ -111,12 +111,12 @@ function History({ s, days, more, loading, onMore }: {
           </div>
           <ul className="space-y-1.5">
             {d.events.map((e, i) => {
-              const cat = s.categories.find((c) => c.id === e.categoryId);
+              const cats = e.categoryIds.map((id) => s.categories.find((c) => c.id === id)).filter((c) => !!c);
               return (
                 <li key={i} className="flex items-center gap-2.5 text-sm">
                   {eventIcon(e)}
                   <span className="min-w-0 flex-1 truncate text-ink2">{e.note || e.source}</span>
-                  {cat && <span style={{ color: cat.color }} title={cat.name}><CategoryIcon name={cat.icon} size={12} /></span>}
+                  {cats.map((cat) => <span key={cat.id} style={{ color: cat.color }} title={cat.name}><CategoryIcon name={cat.icon} size={12} /></span>)}
                   <span className={`shrink-0 font-semibold tabular-nums ${e.kind === 'purchase' ? 'text-ink2' : e.amount >= 0 ? 'text-good' : 'text-bad'}`}>
                     {e.kind === 'purchase'
                       ? <span className="inline-flex items-center gap-1">{e.amount}{e.currency === 'gems' ? <Gem size={11} /> : <Coins size={11} />}</span>
@@ -152,13 +152,13 @@ function Streaks({ s, habits }: { s: AppState; habits: HabitStreak[] }) {
   return (
     <div className="mt-4 space-y-3">
       {habits.map((h) => {
-        const cat = s.categories.find((c) => c.id === h.categoryId);
+        const cats = h.categoryIds.map((id) => s.categories.find((c) => c.id === id)).filter((c) => !!c);
         return (
           <Panel key={h.id} brackets={false} className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
-                  {cat && <span className="inline-flex items-center gap-1" style={{ color: cat.color }}><CategoryIcon name={cat.icon} size={11} /> {cat.name}</span>}
+                  {cats.map((cat) => <span key={cat.id} className="inline-flex items-center gap-1" style={{ color: cat.color }}><CategoryIcon name={cat.icon} size={11} /> {cat.name}</span>)}
                   <span style={{ color: DIFFICULTY_STYLE[h.difficulty].color }}>{DIFFICULTY_STYLE[h.difficulty].label}</span>
                 </div>
                 <h3 className={`mt-1 flex items-center gap-1.5 truncate font-bold ${h.masked ? 'tracking-widest text-ink2' : ''}`}>

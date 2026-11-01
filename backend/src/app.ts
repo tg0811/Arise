@@ -52,10 +52,16 @@ const CategoryBody = z.object({
   icon: z.string().max(40),
 });
 
+// Habits, quests and goals take several categories (`categoryIds`); a single `categoryId` is still accepted.
+const categoryFields = {
+  categoryId: z.number().int().nullable().optional(),
+  categoryIds: z.array(z.number().int()).max(12).optional(),
+};
+
 const HabitBody = z.object({
   title: z.string().trim().min(1).max(80),
   description: z.string().max(500).default(''),
-  categoryId: z.number().int().nullable(),
+  ...categoryFields,
   difficulty,
   days: z.string().regex(/^[0-6]{1,7}$/).default('0123456'),
   deadlineTime: hhmm.nullable().default(null),
@@ -65,7 +71,7 @@ const HabitBody = z.object({
 const QuestBody = z.object({
   title: z.string().trim().min(1).max(80),
   description: z.string().max(500).default(''),
-  categoryId: z.number().int().nullable(),
+  ...categoryFields,
   difficulty,
   deadlineAt: z.string().datetime(),
   boss: z.enum(['none', 'boss', 'weekly']).default('none'),
@@ -80,7 +86,7 @@ const QuestBody = z.object({
 const QuestEditBody = z.object({
   title: z.string().trim().min(1).max(80),
   description: z.string().max(500),
-  categoryId: z.number().int().nullable(),
+  ...categoryFields,
   deadlineAt: z.string().datetime(),
   private: z.boolean().optional(),
 });
@@ -89,7 +95,7 @@ const GoalBody = z.object({
   title: z.string().trim().min(1).max(100),
   description: z.string().max(1000).default(''),
   type: z.enum(GOAL_TYPES as [string, ...string[]]),
-  categoryId: z.number().int().nullable(),
+  ...categoryFields,
   deadlineAt: z.string().datetime(),
   xp: z.number().int().min(10).max(100_000),
 });
@@ -169,6 +175,14 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const c = ctx(req);
     settle(c);
     return fullState(c);
+  };
+
+  /** The request's categories: deduped, and each must be an existing, active category. */
+  const categoriesOf = (b: { categoryId?: number | null; categoryIds?: number[] }): number[] => {
+    const ids = [...new Set(b.categoryIds ?? (b.categoryId != null ? [b.categoryId] : []))];
+    const active = new Set((db.prepare('SELECT id FROM categories WHERE archived = 0').all() as { id: number }[]).map((r) => r.id));
+    for (const i of ids) if (!active.has(i)) throw new HttpError(400, 'Unknown category');
+    return ids;
   };
 
   app.onError((err, c) => {
@@ -269,7 +283,9 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   app.delete('/api/categories/:id', (c) => {
     const cid = id(c.req.param('id'));
     // Keep history intact: a category that was ever used is archived, not deleted.
-    const used = db.prepare('SELECT 1 FROM tasks WHERE category_id = ? UNION SELECT 1 FROM xp_events WHERE category_id = ? LIMIT 1').get(cid, cid);
+    const used = db.prepare(`SELECT 1 FROM tasks, json_each(tasks.category_ids) j WHERE j.value = ?1
+      UNION SELECT 1 FROM goals, json_each(goals.category_ids) j WHERE j.value = ?1
+      UNION SELECT 1 FROM xp_events, json_each(xp_events.category_ids) j WHERE j.value = ?1 LIMIT 1`).get(cid);
     if (used) db.prepare('UPDATE categories SET archived = 1 WHERE id = ?').run(cid);
     else db.prepare('DELETE FROM categories WHERE id = ?').run(cid);
     return c.json(state(c));
@@ -279,9 +295,10 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   app.post('/api/habits', async (c) => {
     const b = HabitBody.parse(await c.req.json());
     const at = clock();
-    db.prepare(`INSERT INTO tasks (kind, title, description, category_id, difficulty, days, deadline_time, private, created_at, created_date)
-      VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(b.title, b.description, b.categoryId, b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), localDate(getProfile(db).timezone, at));
+    const cats = categoriesOf(b);
+    db.prepare(`INSERT INTO tasks (kind, title, description, category_id, category_ids, difficulty, days, deadline_time, private, created_at, created_date)
+      VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), localDate(getProfile(db).timezone, at));
     return c.json(state(c));
   });
 
@@ -291,8 +308,9 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     if (h.kind !== 'habit') throw new HttpError(404, 'Habit not found');
     // A locked private habit can't be edited: the form would only have the mask to save back.
     if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
-    db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, difficulty = ?, days = ?, deadline_time = ?, private = ? WHERE id = ?')
-      .run(b.title, b.description, b.categoryId, b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, h.id);
+    const cats = categoriesOf(b);
+    db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, category_ids = ?, difficulty = ?, days = ?, deadline_time = ?, private = ? WHERE id = ?')
+      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, h.id);
     return c.json(state(c));
   });
 
@@ -325,7 +343,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const b = QuestBody.parse(await c.req.json());
     const cx = ctx(c);
     settle(cx);
-    createQuest(cx, b as Parameters<typeof createQuest>[1]);
+    createQuest(cx, { ...b, categoryIds: categoriesOf(b) } as Parameters<typeof createQuest>[1]);
     return c.json(fullState(cx));
   });
 
@@ -335,9 +353,12 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     if (q.kind !== 'quest' || q.status !== 'pending') throw new HttpError(409, 'Only active quests can be edited');
     if (q.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
     if (new Date(b.deadlineAt) <= clock()) throw new HttpError(400, 'Deadline must be in the future');
+    const cats = categoriesOf(b);
     tx(db, () => {
-      db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, deadline_at = ? WHERE id = ?')
-        .run(b.title, b.description, b.categoryId, b.deadlineAt, q.id);
+      db.prepare('UPDATE tasks SET title = ?, description = ?, deadline_at = ? WHERE id = ?').run(b.title, b.description, b.deadlineAt, q.id);
+      // Categories apply to this quest and the chain parts still to come.
+      db.prepare("UPDATE tasks SET category_id = ?, category_ids = ? WHERE id = ? OR (chain_id = ? AND chain_index > ? AND status = 'locked')")
+        .run(cats[0] ?? null, JSON.stringify(cats), q.id, q.chain_id, q.chain_index);
       // Privacy covers the whole chain, so later parts don't appear in the clear when they unlock.
       if (b.private !== undefined) {
         if (q.chain_id) db.prepare('UPDATE tasks SET private = ? WHERE chain_id = ?').run(b.private ? 1 : 0, q.chain_id);
@@ -375,11 +396,11 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
 
   app.post('/api/goals', async (c) => {
     const b = GoalBody.parse(await c.req.json());
-    return c.json(mutate(c, (cx) => createGoal(cx, b as Parameters<typeof createGoal>[1])));
+    return c.json(mutate(c, (cx) => createGoal(cx, { ...b, categoryIds: categoriesOf(b) } as Parameters<typeof createGoal>[1])));
   });
   app.put('/api/goals/:id', async (c) => {
     const b = GoalBody.parse(await c.req.json());
-    return c.json(mutate(c, (cx) => updateGoal(cx, id(c.req.param('id')), b as Parameters<typeof updateGoal>[2])));
+    return c.json(mutate(c, (cx) => updateGoal(cx, id(c.req.param('id')), { ...b, categoryIds: categoriesOf(b) } as Parameters<typeof updateGoal>[2])));
   });
   app.delete('/api/goals/:id', (c) => c.json(mutate(c, (cx) => deleteGoal(cx, id(c.req.param('id'))))));
   app.post('/api/goals/:id/complete', (c) => c.json(mutate(c, (cx) => completeGoal(cx, id(c.req.param('id'))))));

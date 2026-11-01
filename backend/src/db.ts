@@ -276,6 +276,13 @@ const MIGRATIONS: string[] = [
   `,
   // 9: username (shown in the header) next to the full name. Empty = fall back to the name.
   `ALTER TABLE profile ADD COLUMN username TEXT NOT NULL DEFAULT '';`,
+  `
+  -- 10: several categories per habit, quest, goal and XP event (JSON array of category ids).
+  -- category_id stays as the first one, so older code paths and old backups still line up.
+  ALTER TABLE tasks ADD COLUMN category_ids TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE goals ADD COLUMN category_ids TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE xp_events ADD COLUMN category_ids TEXT NOT NULL DEFAULT '[]';
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [
@@ -303,6 +310,7 @@ function migrate(db: DB) {
       if (v === 1) db.prepare('UPDATE profile SET height_cm = 167 WHERE id = 1').run();
       if (v === 3) seedRewards(db);
       if (v === 7) seedWorkoutDays(db);
+      if (v === 9) backfillCategoryIds(db);
       db.exec(`PRAGMA user_version = ${v + 1}`);
       db.exec('COMMIT');
     } catch (e) {
@@ -335,6 +343,13 @@ export function seedWorkoutDays(db: DB) {
 }
 
 /** Starter store rewards; the owner edits or deletes them freely. */
+/** Rows written before multi-category (or restored from an old backup) get their single category as the list. */
+export function backfillCategoryIds(db: DB) {
+  for (const t of ['tasks', 'goals', 'xp_events']) {
+    db.exec(`UPDATE ${t} SET category_ids = json_array(category_id) WHERE category_ids = '[]' AND category_id IS NOT NULL`);
+  }
+}
+
 export function seedRewards(db: DB) {
   const ins = db.prepare('INSERT INTO store_items (name, description, icon, cost, currency, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
   STARTER_REWARDS.forEach(([name, desc, icon, cost, currency], i) => ins.run(name, desc, icon, cost, currency, i, new Date().toISOString()));

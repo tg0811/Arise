@@ -70,16 +70,17 @@ test('unlocked edit keeps or clears the private flag', async () => {
 });
 
 test('archive history and streaks are masked while locked', async () => {
-  const { h, id } = await withPrivateHabit();
+  const { h, id, soul } = await withPrivateHabit();
   await h.call('POST', `/api/habits/${id}/complete`);
   let a = await h.call('GET', '/api/archive');
   assert.equal(a.history[0].events[0].note, `Completed: ${MASK}`);
-  assert.equal(a.history[0].events[0].categoryId, null);
+  assert.deepEqual(a.history[0].events[0].categoryIds, []);
   assert.equal(a.habitStreaks[0].title, MASK);
   assert.equal(JSON.stringify(a).includes('Secret ritual'), false);
   await h.call('POST', '/api/private/unlock', { password: 'arise123' });
   a = await h.call('GET', '/api/archive');
   assert.equal(a.history[0].events[0].note, 'Completed: Secret ritual');
+  assert.deepEqual(a.history[0].events[0].categoryIds, [soul]);
   assert.equal(a.habitStreaks[0].title, 'Secret ritual');
 });
 

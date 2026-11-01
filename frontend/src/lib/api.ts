@@ -4,7 +4,7 @@ import type { Difficulty, GoalType, LootType, Mood, Rank, ReminderPrefs } from '
 // Mirrors backend buildState(). Every mutation returns the full fresh state.
 export interface Category { id: number; name: string; color: string; icon: string; sort: number; xp: number; level: number; into: number; need: number; pct: number }
 export interface Habit {
-  id: number; title: string; description: string; categoryId: number | null; difficulty: Difficulty;
+  id: number; title: string; description: string; /** Every category it trains (full XP to each). */ categoryIds: number[]; difficulty: Difficulty;
   days: string; deadlineTime: string | null; scheduledToday: boolean;
   /** Private habit; `masked` while this device hasn't unlocked (title/description/category hidden). */
   private: boolean; masked: boolean;
@@ -12,7 +12,7 @@ export interface Habit {
   streak: number; multiplier: number; xpGain: number; xpLoss: number;
 }
 export interface Quest {
-  id: number; title: string; description: string; categoryId: number | null; difficulty: Difficulty;
+  id: number; title: string; description: string; /** Every category it trains (full XP to each). */ categoryIds: number[]; difficulty: Difficulty;
   status: 'pending' | 'done' | 'failed'; deadlineAt: string; completedAt: string | null;
   boss: 'none' | 'boss' | 'weekly'; chain: { index: number; total: number } | null;
   xp: number; credits: number; canUndo: boolean;
@@ -59,9 +59,9 @@ export interface Title { key: string; name: string; hint: string; cur: number; t
 // ---------------------------------------------------------------- archive (fetched on demand)
 
 export interface DayStat { date: string; total: number; done: number; gained: number; lost: number }
-export interface HistoryEvent { at: string; kind: 'xp' | 'purchase'; amount: number; currency?: 'credits' | 'gems'; categoryId: number | null; source: string; note: string }
+export interface HistoryEvent { at: string; kind: 'xp' | 'purchase'; amount: number; currency?: 'credits' | 'gems'; categoryIds: number[]; source: string; note: string }
 export interface HabitStreak {
-  id: number; title: string; categoryId: number | null; difficulty: Difficulty; days: string;
+  id: number; title: string; categoryIds: number[]; difficulty: Difficulty; days: string;
   current: number; best: number; done: number; failed: number; rate: number | null; private: boolean; masked: boolean;
   strip: ('done' | 'failed' | 'rest' | 'pending' | 'none')[];
 }
@@ -90,7 +90,7 @@ export const useArchive = () =>
   });
 
 export interface Goal {
-  id: number; title: string; description: string; type: GoalType; categoryId: number | null;
+  id: number; title: string; description: string; type: GoalType; categoryIds: number[];
   deadlineAt: string; xp: number; status: 'active' | 'done'; pastDue: boolean; completedAt: string | null;
   reward: number; hasAar: boolean; canUndo: boolean;
 }

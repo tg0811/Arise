@@ -5,7 +5,7 @@ import { GOAL_LATE_SHARE, GOAL_SIZES, GOAL_TYPES, JOURNAL_AAR_XP, creditsFor, ty
 import { useAction, type AppState, type Goal, type JournalEntry } from '../lib/api';
 import { formatDate, toLocalInput } from '../lib/time';
 import { Countdown } from '../components/Countdown';
-import { CategoryPicker, Field } from '../components/TaskForm';
+import { CategoriesPicker, Field } from '../components/TaskForm';
 import { Button, CategoryIcon, Panel, SectionTitle, Sheet, Tabs, useToast } from '../components/ui';
 import { sfx } from '../lib/sound';
 
@@ -82,7 +82,7 @@ function GoalCard({ s, g, onEdit, onReview }: { s: AppState; g: Goal; onEdit: ()
   const toast = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const view = GOAL_TYPE_VIEW[g.type];
-  const cat = s.categories.find((c) => c.id === g.categoryId);
+  const cats = g.categoryIds.map((id) => s.categories.find((c) => c.id === id)).filter((c) => !!c);
   const run = (method: string, path: string, msg: string, tone: 'good' | 'info' = 'info') =>
     action.mutate({ method, path }, { onSuccess: () => { if (tone === 'good') sfx.complete(); toast(msg, tone); }, onError: (e) => toast(e.message, 'bad') });
 
@@ -94,7 +94,7 @@ function GoalCard({ s, g, onEdit, onReview }: { s: AppState; g: Goal; onEdit: ()
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] font-black uppercase tracking-wider text-accent">{view.label}</span>
-            {cat && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: cat.color }}><CategoryIcon name={cat.icon} size={11} /> {cat.name}</span>}
+            {cats.map((cat) => <span key={cat.id} className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: cat.color }}><CategoryIcon name={cat.icon} size={11} /> {cat.name}</span>)}
             {g.pastDue && g.status === 'active' && <span className="rounded bg-bad/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-bad">Past due · −{g.xp} paid</span>}
           </div>
           <h3 className="mt-1 font-bold leading-snug">{g.title}</h3>
@@ -164,14 +164,14 @@ function GoalForm({ s, goal, onDone }: { s: AppState; goal: Goal | null; onDone:
   const [title, setTitle] = useState(goal?.title ?? '');
   const [description, setDescription] = useState(goal?.description ?? '');
   const [type, setType] = useState<GoalType>(goal?.type ?? 'forge');
-  const [categoryId, setCategoryId] = useState<number | null>(goal?.categoryId ?? null);
+  const [categoryIds, setCategoryIds] = useState<number[]>(goal?.categoryIds ?? []);
   const [xp, setXp] = useState(goal?.xp ?? GOAL_SIZES[1].xp);
   const [deadline, setDeadline] = useState(toLocalInput(goal ? new Date(goal.deadlineAt) : defaultDeadline()));
   const locked = !!goal?.pastDue;
 
   const save = () => {
     if (!title.trim()) return toast('Name the goal', 'bad');
-    const body = { title, description, type, categoryId, xp, deadlineAt: locked ? goal!.deadlineAt : new Date(deadline).toISOString() };
+    const body = { title, description, type, categoryIds, xp, deadlineAt: locked ? goal!.deadlineAt : new Date(deadline).toISOString() };
     action.mutate(goal ? { method: 'PUT', path: `/goals/${goal.id}`, body } : { path: '/goals', body }, {
       onSuccess: () => { toast('Saved', 'good'); onDone(); },
       onError: (e) => toast(e.message, 'bad'),
@@ -197,7 +197,7 @@ function GoalForm({ s, goal, onDone }: { s: AppState; goal: Goal | null; onDone:
           })}
         </div>
       </Field>
-      <Field label="Category"><CategoryPicker s={s} value={categoryId} onChange={setCategoryId} /></Field>
+      <Field label="Categories"><CategoriesPicker s={s} value={categoryIds} onChange={setCategoryIds} /></Field>
       <Field label="Stakes: XP won on time, lost if the deadline passes">
         <div className="grid grid-cols-4 gap-1.5">
           {GOAL_SIZES.map((sz) => (
