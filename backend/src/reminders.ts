@@ -162,7 +162,7 @@ export function dueReminders(ctx: Ctx): PushMessage[] {
       if (!q.deadline_at) continue;
       const left = Math.round((Date.parse(q.deadline_at) - at.getTime()) / 60_000);
       if (left > 0 && left <= prefs.nudgeMinutes && once(db, `quest:${q.id}`, at)) {
-        out.push({ title: `⚔️ ${q.title}`, body: `Quest expires in ${left} min. Clear it or lose the XP.`, tag: `quest-${q.id}`, url: '/' });
+        out.push({ title: q.private ? '🔒 Private quest' : `⚔️ ${q.title}`, body: `Quest expires in ${left} min. Clear it or lose the XP.`, tag: `quest-${q.id}`, url: '/' });
       }
     }
   }

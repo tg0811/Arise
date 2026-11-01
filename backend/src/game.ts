@@ -32,6 +32,15 @@ export interface Ctx {
 /** What a locked private habit shows instead of its name (fixed length: no hint of the real one). */
 export const PRIVATE_MASK = '• • • • • • • •';
 
+/** Name, description and category of a habit or quest, hidden while it's private and this session is locked. */
+export function maskTask(ctx: Ctx, t: Task) {
+  const masked = !!t.private && !ctx.reveal;
+  return {
+    id: t.id, title: masked ? PRIVATE_MASK : t.title, description: masked ? '' : t.description,
+    categoryId: masked ? null : t.category_id, difficulty: t.difficulty, private: !!t.private, masked,
+  };
+}
+
 export interface Profile {
   name: string;
   avatar: string | null;
@@ -200,6 +209,8 @@ export interface NewQuest {
   difficulty: Difficulty;
   deadlineAt: string;
   boss: 'none' | 'boss' | 'weekly';
+  /** Hidden behind the password, like a private habit. Every part of a chain shares it. */
+  private: boolean;
   /** Follow-up chain parts, unlocked one by one; each gets `durationHours` once unlocked. */
   parts: { title: string; description: string; durationHours: number }[];
 }
@@ -223,14 +234,15 @@ export function createQuest(ctx: Ctx, q: NewQuest): number {
     const chainId = q.parts.length ? randomBytes(6).toString('hex') : null;
     const total = q.parts.length + 1;
     const ins = ctx.db.prepare(`INSERT INTO tasks
-      (kind, title, description, category_id, difficulty, status, deadline_at, chain_id, chain_index, chain_total, duration_hours, boss, xp_value, created_at, created_date)
-      VALUES ('quest', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (kind, title, description, category_id, difficulty, status, deadline_at, chain_id, chain_index, chain_total, duration_hours, boss, xp_value, private, created_at, created_date)
+      VALUES ('quest', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const priv = q.private ? 1 : 0;
     const first = ins.run(q.title, q.description, q.categoryId, q.difficulty, 'pending', q.deadlineAt,
-      chainId, chainId ? 1 : null, chainId ? total : null, null, q.boss, xpValue, ctx.at.toISOString(), date);
+      chainId, chainId ? 1 : null, chainId ? total : null, null, q.boss, xpValue, priv, ctx.at.toISOString(), date);
     // Later parts inherit category/difficulty/boss-ness of the chain.
     q.parts.forEach((p, i) => {
       ins.run(p.title, p.description, q.categoryId, q.difficulty, 'locked', null,
-        chainId, i + 2, total, p.durationHours, q.boss === 'weekly' ? 'none' : q.boss, null, ctx.at.toISOString(), date);
+        chainId, i + 2, total, p.durationHours, q.boss === 'weekly' ? 'none' : q.boss, null, priv, ctx.at.toISOString(), date);
     });
     return Number(first.lastInsertRowid);
   });
@@ -467,10 +479,8 @@ export function buildState(ctx: Ctx) {
     const before = habitStreakBefore(db, h, todayStr);
     const streak = log?.status === 'done' ? before + 1 : before;
     const nextMultiplier = streakMultiplier(before + 1);
-    const masked = !!h.private && !ctx.reveal;
     return {
-      id: h.id, title: masked ? PRIVATE_MASK : h.title, description: masked ? '' : h.description,
-      categoryId: masked ? null : h.category_id, difficulty: h.difficulty, private: !!h.private, masked,
+      ...maskTask(ctx, h),
       days: h.days, deadlineTime: h.deadline_time, scheduledToday: isScheduled(h.days, todayStr),
       log: log ? { status: log.status, xp: log.xp } : null,
       streak, multiplier: nextMultiplier,
@@ -483,7 +493,7 @@ export function buildState(ctx: Ctx) {
   const quests = questRows
     .filter((q) => q.status === 'pending' || (q.completed_at && localDate(tz, new Date(q.completed_at)) === todayStr))
     .map((q) => ({
-      id: q.id, title: q.title, description: q.description, categoryId: q.category_id, difficulty: q.difficulty,
+      ...maskTask(ctx, q),
       status: q.status, deadlineAt: q.deadline_at, completedAt: q.completed_at, boss: q.boss,
       chain: q.chain_id ? { index: q.chain_index!, total: q.chain_total! } : null,
       xp: questXp(q), credits: creditsFor(questXp(q)),

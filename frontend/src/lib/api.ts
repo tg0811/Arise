@@ -16,6 +16,8 @@ export interface Quest {
   status: 'pending' | 'done' | 'failed'; deadlineAt: string; completedAt: string | null;
   boss: 'none' | 'boss' | 'weekly'; chain: { index: number; total: number } | null;
   xp: number; credits: number; canUndo: boolean;
+  /** Private quest; `masked` while this device hasn't unlocked. A chain shares one setting. */
+  private: boolean; masked: boolean;
 }
 export interface AppState {
   now: string;

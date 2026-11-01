@@ -65,11 +65,14 @@ export function archiveState(ctx: Ctx, historyBefore?: string) {
     .all(start, end) as { at: string; date: string; amount: number; category_id: number | null; source: string; source_id: number | null; note: string }[];
   const purchases = db.prepare("SELECT at, date, amount, currency, note FROM currency_events WHERE source = 'store' AND date >= ? AND date < ? ORDER BY id DESC")
     .all(start, end) as { at: string; date: string; amount: number; currency: 'credits' | 'gems'; note: string }[];
-  // Ledger notes name the habit ("Completed: X"); mask the ones that belong to locked private habits.
-  const privateLogIds = ctx.reveal ? new Set<number>() : new Set((db.prepare(
-    'SELECT l.id FROM habit_logs l JOIN tasks t ON t.id = l.task_id WHERE t.private = 1').all() as { id: number }[]).map((r) => r.id));
+  // Ledger notes name the habit or quest ("Completed: X"); mask the ones that belong to locked private ones.
+  // Habit events point at a habit_logs row, quest events at the quest itself.
+  const ids = (sql: string) => (ctx.reveal ? new Set<number>() : new Set((db.prepare(sql).all() as { id: number }[]).map((r) => r.id)));
+  const privateLogIds = ids('SELECT l.id FROM habit_logs l JOIN tasks t ON t.id = l.task_id WHERE t.private = 1');
+  const privateQuestIds = ids("SELECT id FROM tasks WHERE kind = 'quest' AND private = 1");
   const maskNote = (e: { source: string; source_id: number | null; note: string }) =>
-    e.source === 'habit' && e.source_id !== null && privateLogIds.has(e.source_id) ? `${e.note.split(':')[0]}: ${PRIVATE_MASK}` : e.note;
+    e.source_id !== null && ((e.source === 'habit' && privateLogIds.has(e.source_id)) || (e.source === 'quest' && privateQuestIds.has(e.source_id)))
+      ? `${e.note.split(':')[0]}: ${PRIVATE_MASK}` : e.note;
   const byDate = new Map<string, HistoryEvent[]>();
   const push = (date: string, e: HistoryEvent) => byDate.set(date, [...(byDate.get(date) ?? []), e]);
   for (const e of xpEvents) {

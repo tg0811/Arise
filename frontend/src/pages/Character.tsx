@@ -96,16 +96,20 @@ function Profile({ s }: { s: AppState }) {
       <Titles s={s} />
 
       <SectionTitle>Rank ladder</SectionTitle>
-      <Panel brackets={false} className="divide-y divide-line">
+      <Panel brackets={false} className="divide-y divide-line overflow-hidden">
         {RANKS.map((r) => {
           const current = r.rank === p.rank;
           const reached = p.level >= r.minLevel;
           return (
             // Each rank in its own colour, so the warm → cool climb is visible at a glance.
+            // The current rank is a tinted row with a "YOU" tag (overflow-hidden keeps the tint inside the rounded corners).
             <div key={r.rank} className="flex items-center gap-4 px-4 py-3"
-              style={current ? { background: `color-mix(in srgb, ${rankColor(r.rank)} 14%, transparent)`, boxShadow: `inset 3px 0 0 ${rankColor(r.rank)}` } : undefined}>
+              style={current ? { background: `color-mix(in srgb, ${rankColor(r.rank)} 14%, transparent)` } : undefined}>
               <span className={`w-8 font-display text-3xl font-bold ${reached ? 'text-glow' : 'opacity-35'}`} style={{ color: rankColor(r.rank) }}>{r.rank}</span>
-              <span className={`flex-1 font-display text-sm tracking-wider ${reached ? 'text-ink' : 'text-muted'}`}>{r.title}</span>
+              <span className={`flex-1 font-display text-sm tracking-wider ${reached ? 'text-ink' : 'text-muted'}`}>
+                {r.title}
+                {current && <span className="ml-2 rounded px-1.5 py-0.5 align-middle text-[10px] font-black tracking-[0.15em]" style={{ color: rankColor(r.rank), background: `color-mix(in srgb, ${rankColor(r.rank)} 20%, transparent)` }}>YOU</span>}
+              </span>
               <span className="text-xs text-muted">Lv {r.minLevel}+</span>
             </div>
           );

@@ -69,6 +69,7 @@ const QuestBody = z.object({
   difficulty,
   deadlineAt: z.string().datetime(),
   boss: z.enum(['none', 'boss', 'weekly']).default('none'),
+  private: z.boolean().default(false),
   parts: z.array(z.object({
     title: z.string().trim().min(1).max(80),
     description: z.string().max(500).default(''),
@@ -81,6 +82,7 @@ const QuestEditBody = z.object({
   description: z.string().max(500),
   categoryId: z.number().int().nullable(),
   deadlineAt: z.string().datetime(),
+  private: z.boolean().optional(),
 });
 
 const GoalBody = z.object({
@@ -288,7 +290,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const h = getTask(db, id(c.req.param('id')));
     if (h.kind !== 'habit') throw new HttpError(404, 'Habit not found');
     // A locked private habit can't be edited: the form would only have the mask to save back.
-    if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private habits first');
+    if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
     db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, difficulty = ?, days = ?, deadline_time = ?, private = ? WHERE id = ?')
       .run(b.title, b.description, b.categoryId, b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, h.id);
     return c.json(state(c));
@@ -297,7 +299,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
   app.delete('/api/habits/:id', (c) => {
     const h = getTask(db, id(c.req.param('id')));
     if (h.kind !== 'habit') throw new HttpError(404, 'Habit not found');
-    if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private habits first');
+    if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
     // Archive so past logs (and the XP they moved) stay in history.
     db.prepare('UPDATE tasks SET archived = 1 WHERE id = ?').run(h.id);
     return c.json(state(c));
@@ -331,14 +333,23 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const b = QuestEditBody.parse(await c.req.json());
     const q = getTask(db, id(c.req.param('id')));
     if (q.kind !== 'quest' || q.status !== 'pending') throw new HttpError(409, 'Only active quests can be edited');
+    if (q.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
     if (new Date(b.deadlineAt) <= clock()) throw new HttpError(400, 'Deadline must be in the future');
-    db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, deadline_at = ? WHERE id = ?')
-      .run(b.title, b.description, b.categoryId, b.deadlineAt, q.id);
+    tx(db, () => {
+      db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, deadline_at = ? WHERE id = ?')
+        .run(b.title, b.description, b.categoryId, b.deadlineAt, q.id);
+      // Privacy covers the whole chain, so later parts don't appear in the clear when they unlock.
+      if (b.private !== undefined) {
+        if (q.chain_id) db.prepare('UPDATE tasks SET private = ? WHERE chain_id = ?').run(b.private ? 1 : 0, q.chain_id);
+        else db.prepare('UPDATE tasks SET private = ? WHERE id = ?').run(b.private ? 1 : 0, q.id);
+      }
+    });
     return c.json(state(c));
   });
 
   app.delete('/api/quests/:id', (c) => {
     const cx = ctx(c);
+    if (getTask(db, id(c.req.param('id'))).private && !cx.reveal) throw new HttpError(403, 'Unlock private items first');
     deleteQuest(cx, id(c.req.param('id')));
     settle(cx);
     return c.json(fullState(cx));

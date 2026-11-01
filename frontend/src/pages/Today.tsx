@@ -6,12 +6,15 @@ import { PrivateUnlockedBar } from '../components/Private';
 import { LootboxButton } from '../components/Lootbox';
 import { Countdown } from '../components/Countdown';
 import { DAY_CLEAR_RATIO } from '@shared';
-import type { AppState, Habit, Quest } from '../lib/api';
-import { HabitCard, QuestCard } from '../components/TaskCards';
+import { daysLabel } from '../lib/time';
+import type { AppState, Habit } from '../lib/api';
+import { HabitCard, QuestCard, TaskDetail } from '../components/TaskCards';
 import { TaskForm } from '../components/TaskForm';
 import { Panel, ProgressBar, SectionTitle, Sheet } from '../components/ui';
 
-type Editing = { kind: 'new' } | { kind: 'habit'; habit: Habit } | { kind: 'quest'; quest: Quest } | null;
+// What the task sheet shows: a new task (starting on the tab you came from), or one habit/quest by id,
+// either its details (`edit: false`) or its form. By id, so the sheet follows live state updates.
+type Editing = { kind: 'new'; as: 'habit' | 'quest' } | { kind: 'habit' | 'quest'; id: number; edit: boolean } | null;
 
 export function Today({ s }: { s: AppState }) {
   const [editing, setEditing] = useState<Editing>(null);
@@ -25,6 +28,12 @@ export function Today({ s }: { s: AppState }) {
   const resolvedQuests = s.quests.filter((q) => q.status !== 'pending');
   const t = s.streak.today;
   const activeGoals = s.goals.filter((g) => g.status === 'active');
+  const openHabit = editing?.kind === 'habit' ? s.habits.find((h) => h.id === editing.id) : undefined;
+  const openQuest = editing?.kind === 'quest' ? s.quests.find((q) => q.id === editing.id) : undefined;
+  // Deleted (or expired out of today's list) while open: close the sheet.
+  const sheetOpen = editing?.kind === 'new' || !!openHabit || !!openQuest;
+  const sheetTitle = editing?.kind === 'new' ? 'New task'
+    : `${editing && 'edit' in editing && editing.edit ? 'Edit ' : ''}${editing?.kind === 'habit' ? 'habit' : 'quest'}`.replace(/^./, (c) => c.toUpperCase());
   const date = new Date(s.today + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -83,37 +92,42 @@ export function Today({ s }: { s: AppState }) {
       <SectionTitle right={<span className="text-xs font-bold text-muted">{todayHabits.filter((h) => h.log).length}/{todayHabits.length}</span>}>Daily Habits</SectionTitle>
       <PrivateUnlockedBar s={s} />
       {sortedHabits.length === 0 ? (
-        <EmptyHint text="No habits today. Add the disciplines you want to hold yourself to." onAdd={() => setEditing({ kind: 'new' })} />
+        <EmptyHint text="No habits today. Add the disciplines you want to hold yourself to." onAdd={() => setEditing({ kind: 'new', as: 'habit' })} />
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
-          {sortedHabits.map((h) => <HabitCard key={h.id} s={s} h={h} onEdit={() => setEditing({ kind: 'habit', habit: h })} />)}
+          {sortedHabits.map((h) => (
+            <HabitCard key={h.id} s={s} h={h} onOpen={() => setEditing({ kind: 'habit', id: h.id, edit: false })} onEdit={() => setEditing({ kind: 'habit', id: h.id, edit: true })} />
+          ))}
         </div>
       )}
 
       <SectionTitle right={<span className="text-xs font-bold text-muted">{activeQuests.length} active</span>}>Quests</SectionTitle>
       {activeQuests.length === 0 && resolvedQuests.length === 0 ? (
-        <EmptyHint text="No active quests. One-off missions with a deadline go here." onAdd={() => setEditing({ kind: 'new' })} />
+        <EmptyHint text="No active quests. One-off missions with a deadline go here." onAdd={() => setEditing({ kind: 'new', as: 'quest' })} />
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
-          {[...activeQuests, ...resolvedQuests].map((q) => <QuestCard key={q.id} s={s} q={q} onEdit={() => setEditing({ kind: 'quest', quest: q })} />)}
+          {[...activeQuests, ...resolvedQuests].map((q) => (
+            <QuestCard key={q.id} s={s} q={q} onOpen={() => setEditing({ kind: 'quest', id: q.id, edit: false })} onEdit={() => setEditing({ kind: 'quest', id: q.id, edit: true })} />
+          ))}
         </div>
       )}
 
       {restHabits.length > 0 && (
         <>
           <SectionTitle>Resting today</SectionTitle>
+          <p className="-mt-1 mb-2 text-xs text-muted">Not scheduled today, so nothing to do: no XP to gain or lose.</p>
           <div className="flex flex-wrap gap-2">
             {restHabits.map((h) => (
-              <button key={h.id} onClick={() => setEditing({ kind: 'habit', habit: h })}
+              <button key={h.id} onClick={() => setEditing({ kind: 'habit', id: h.id, edit: false })}
                 className="glass inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm text-ink2">
-                <Moon size={13} /> {h.title}
+                <Moon size={13} /> {h.title} <span className="text-xs text-muted">· {daysLabel(h.days)}</span>
               </button>
             ))}
           </div>
         </>
       )}
 
-      <button onClick={() => setEditing({ kind: 'new' })} aria-label="Add"
+      <button onClick={() => setEditing({ kind: 'new', as: 'habit' })} aria-label="Add"
         className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_0_24px_color-mix(in_srgb,var(--sl-accent)_60%,transparent)] transition active:scale-90 md:bottom-8 md:right-8"
         style={{ background: 'linear-gradient(135deg, var(--sl-accent), var(--sl-accent2))' }}>
         <Plus size={26} />
@@ -123,11 +137,16 @@ export function Today({ s }: { s: AppState }) {
         {focusOpen && <FocusForm s={s} onDone={() => setFocusOpen(false)} />}
       </Sheet>
 
-      <Sheet open={editing !== null} onClose={() => setEditing(null)}
-        title={editing?.kind === 'habit' ? 'Edit habit' : editing?.kind === 'quest' ? 'Edit quest' : 'New task'}>
-        {editing && (
-          <TaskForm key={editing.kind === 'habit' ? `h${editing.habit.id}` : editing.kind === 'quest' ? `q${editing.quest.id}` : 'new'}
-            s={s} mode={editing} onDone={() => setEditing(null)} />
+      <Sheet open={sheetOpen} onClose={() => setEditing(null)} title={sheetTitle}>
+        {editing?.kind === 'new' && <TaskForm key={`new-${editing.as}`} s={s} mode={{ kind: 'new', as: editing.as }} onDone={() => setEditing(null)} />}
+        {editing && editing.kind !== 'new' && (openHabit || openQuest) && (
+          editing.edit ? (
+            <TaskForm key={`${editing.kind}${editing.id}`} s={s}
+              mode={openHabit ? { kind: 'habit', habit: openHabit } : { kind: 'quest', quest: openQuest! }} onDone={() => setEditing(null)} />
+          ) : (
+            <TaskDetail s={s} task={openHabit ? { kind: 'habit', h: openHabit } : { kind: 'quest', q: openQuest! }}
+              onEdit={() => setEditing({ ...editing, edit: true })} />
+          )
         )}
       </Sheet>
     </div>

@@ -61,14 +61,14 @@ function DifficultyPicker({ value, onChange, multiplier = 1 }: { value: Difficul
   );
 }
 
-type Mode = { kind: 'new' } | { kind: 'habit'; habit: Habit } | { kind: 'quest'; quest: Quest };
+type Mode = { kind: 'new'; as: 'habit' | 'quest' } | { kind: 'habit'; habit: Habit } | { kind: 'quest'; quest: Quest };
 
 export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone: () => void }) {
   const action = useAction();
   const toast = useToast();
   const editingHabit = mode.kind === 'habit' ? mode.habit : null;
   const editingQuest = mode.kind === 'quest' ? mode.quest : null;
-  const [kind, setKind] = useState<'habit' | 'quest'>(editingQuest ? 'quest' : 'habit');
+  const [kind, setKind] = useState<'habit' | 'quest'>(mode.kind === 'new' ? mode.as : mode.kind);
 
   const src = editingHabit ?? editingQuest;
   const [title, setTitle] = useState(src?.title ?? '');
@@ -78,7 +78,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   // habit
   const [days, setDays] = useState(editingHabit?.days ?? '0123456');
   const [deadlineTime, setDeadlineTime] = useState(editingHabit?.deadlineTime ?? '');
-  const [isPrivate, setIsPrivate] = useState(editingHabit?.private ?? false);
+  const [isPrivate, setIsPrivate] = useState(src?.private ?? false);
   // quest
   const [deadline, setDeadline] = useState(toLocalInput(editingQuest ? new Date(editingQuest.deadlineAt) : endOfToday()));
   const [boss, setBoss] = useState<'none' | 'boss' | 'weekly'>('none');
@@ -94,10 +94,10 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
     } else {
       const deadlineAt = new Date(deadline).toISOString();
       if (editingQuest) {
-        action.mutate({ method: 'PUT', path: `/quests/${editingQuest.id}`, body: { title, description, categoryId, deadlineAt } }, done);
+        action.mutate({ method: 'PUT', path: `/quests/${editingQuest.id}`, body: { title, description, categoryId, deadlineAt, private: isPrivate } }, done);
       } else {
         const cleanParts = parts.filter((p) => p.title.trim()).map((p) => ({ ...p, description: '' }));
-        action.mutate({ path: '/quests', body: { title, description, categoryId, difficulty, deadlineAt, boss, parts: cleanParts } }, done);
+        action.mutate({ path: '/quests', body: { title, description, categoryId, difficulty, deadlineAt, boss, private: isPrivate, parts: cleanParts } }, done);
       }
     }
   };
@@ -164,13 +164,6 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
             </div>
             <p className="mt-1.5 text-xs text-muted">Shown as "by HH:MM". You report honestly; anything unresolved fails at midnight.</p>
           </Field>
-          <label className="mb-4 flex items-start gap-3 rounded-xl border border-line p-3 text-sm">
-            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--sl-accent)]" />
-            <span>
-              <span className="flex items-center gap-1.5 font-semibold"><Lock size={13} /> Private habit</span>
-              <span className="block text-xs text-muted">Name, description and category stay hidden (• • • •) until you unlock with your password. You can still complete it while hidden.</span>
-            </span>
-          </label>
         </>
       ) : (
         <>
@@ -215,6 +208,17 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
           )}
         </>
       )}
+
+      <label className="mb-4 flex items-start gap-3 rounded-xl border border-line p-3 text-sm">
+        <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--sl-accent)]" />
+        <span>
+          <span className="flex items-center gap-1.5 font-semibold"><Lock size={13} /> Private {kind}</span>
+          <span className="block text-xs text-muted">
+            Name, description and category stay hidden (• • • •) until you unlock with your password. You can still {kind === 'habit' ? 'complete' : 'clear'} it while hidden.
+            {kind === 'quest' && ' Applies to every part of a chain.'}
+          </span>
+        </span>
+      </label>
 
       <div className="mt-2 flex gap-2">
         {editingHabit && <Button variant="bad" onClick={archive}><Trash2 size={15} /></Button>}
