@@ -139,14 +139,15 @@ export function GenerativeArt({ color, color2, sim }: { color: string; color2: s
 // ---------------------------------------------------------------- ambient particles
 
 /** More and livelier particles as you rank up: motes → sparks → god rays at S. */
-// Counts doubled twice at the owner's request (2026-11-01): 4× the original embers.
+// Owner's choice (2026-11-01): 40 embers from the start, then a gentle ramp to 80 at S, so the cards stay calm
+// (they're translucent, so embers show through them). S rank's real signal is the god rays.
 const AMBIENT: Record<Rank, { count: number; speed: number; rays: boolean }> = {
   E: { count: 40, speed: 0.15, rays: false },
-  D: { count: 56, speed: 0.18, rays: false },
-  C: { count: 72, speed: 0.22, rays: false },
-  B: { count: 96, speed: 0.28, rays: false },
-  A: { count: 120, speed: 0.34, rays: false },
-  S: { count: 144, speed: 0.38, rays: true },
+  D: { count: 48, speed: 0.18, rays: false },
+  C: { count: 56, speed: 0.22, rays: false },
+  B: { count: 64, speed: 0.28, rays: false },
+  A: { count: 72, speed: 0.34, rays: false },
+  S: { count: 80, speed: 0.38, rays: true },
 };
 
 export function AmbientParticles({ rank }: { rank: Rank }) {
