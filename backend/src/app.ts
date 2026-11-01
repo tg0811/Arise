@@ -70,7 +70,8 @@ const HabitBody = z.object({
   days: z.string().regex(/^[0-6]{1,7}$/).default('0123456'),
   deadlineTime: hhmm.nullable().default(null),
   private: z.boolean().default(false),
-  /** On create: first day is tomorrow (e.g. a morning habit added at night). */
+  /** On create: the first day it counts, YYYY-MM-DD (today or later). `startsTomorrow` is the older shorthand. */
+  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   startsTomorrow: z.boolean().default(false),
 });
 
@@ -359,10 +360,13 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const b = HabitBody.parse(await c.req.json());
     const at = clock();
     const cats = categoriesOf(b);
-    const start = localDate(getProfile(db).timezone, at);
+    const todayStr = localDate(getProfile(db).timezone, at);
+    const start = b.startsOn ?? (b.startsTomorrow ? addDays(todayStr, 1) : todayStr);
+    if (start < todayStr) throw new HttpError(400, "A habit can't start in the past");
+    if (start > addDays(todayStr, 366)) throw new HttpError(400, 'Pick a start date within a year');
     db.prepare(`INSERT INTO tasks (kind, title, description, category_id, category_ids, difficulty, days, deadline_time, private, created_at, created_date)
       VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), b.startsTomorrow ? addDays(start, 1) : start);
+      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), start);
     return c.json(state(c));
   });
 

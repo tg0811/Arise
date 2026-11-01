@@ -180,3 +180,19 @@ test('a raise waiting over a gap of unsettled days: earlier days fail at the old
   const amounts = (await h.call('GET', '/api/archive')).history.flatMap((d: any) => d.events).map((e: any) => e.amount).sort();
   assert.deepEqual(amounts, [-10, -50, -50]);
 });
+
+test('a habit can start on a picked date, never in the past', async () => {
+  const h = harness(); // Monday 02-11-2026
+  let s = await h.boot();
+  await assert.rejects(h.call('POST', '/api/habits', { title: 'Past', difficulty: 'easy', startsOn: '2026-11-01' }), { status: 400 });
+  await assert.rejects(h.call('POST', '/api/habits', { title: 'Far', difficulty: 'easy', startsOn: '2028-01-01' }), { status: 400 });
+  s = await h.call('POST', '/api/habits', { title: 'Later', difficulty: 'easy', startsOn: '2026-11-05' });
+  assert.deepEqual([s.habits[0].startsOn, s.habits[0].scheduledToday], ['2026-11-05', false]);
+  h.advance(48); // Wednesday 04-11: still not started, nothing failed
+  s = await h.call('GET', '/api/state');
+  assert.deepEqual([s.habits[0].scheduledToday, s.progress.totalXp], [false, 0]);
+  assert.equal((await h.call('GET', '/api/archive')).history.length, 0);
+  h.advance(24); // Thursday 05-11: its first day
+  s = await h.call('GET', '/api/state');
+  assert.equal(s.habits[0].scheduledToday, true);
+});

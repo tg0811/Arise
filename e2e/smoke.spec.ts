@@ -96,6 +96,17 @@ test('habit that starts tomorrow is not due today and says when it starts', asyn
   await sheet().getByRole('button', { name: 'Tomorrow', exact: true }).click();
   await button('Create habit').click();
   await expect(page.getByRole('button', { name: /Wake up at 5:30 · starts \d{2}-\d{2}-\d{4}/ })).toBeVisible();
+
+  // Or any later day from the date picker.
+  await page.getByLabel('Add', { exact: true }).click();
+  await page.getByPlaceholder('Sleep by 22:30').fill('Ten-day challenge');
+  const inFiveDays = new Date(Date.now() + 5 * 86400_000);
+  const iso = `${inFiveDays.getFullYear()}-${String(inFiveDays.getMonth() + 1).padStart(2, '0')}-${String(inFiveDays.getDate()).padStart(2, '0')}`;
+  await sheet().getByLabel('Start date').fill(iso);
+  await expect(sheet().getByText(/Nothing due until \w+ \d{2}-\d{2}-\d{4}/)).toBeVisible();
+  await button('Create habit').click();
+  const ddmmyyyy = iso.split('-').reverse().join('-');
+  await expect(page.getByRole('button', { name: `Ten-day challenge · starts ${ddmmyyyy}` })).toBeVisible();
 });
 
 test('quest: the quest section Add opens on the Quest tab; clearing pays XP and credits', async () => {

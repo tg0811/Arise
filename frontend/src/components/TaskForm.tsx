@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
-import { Plus, Trash2, Repeat, Swords, Skull, Crown, Lock } from 'lucide-react';
+import { Plus, Trash2, Repeat, Swords, Skull, Crown, Lock, CalendarDays } from 'lucide-react';
 import { DIFFICULTIES, DIFFICULTY_XP, BOSS_MULTIPLIER, addDays as addDayStr, type Difficulty } from '@shared';
 import { useAction, type AppState, type Habit, type Quest } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
-import { formatDateTime, formatDay, toLocalInput } from '../lib/time';
+import { formatDate, formatDateTime, formatDay, toLocalInput } from '../lib/time';
 import { Button, CategoryIcon, useToast } from './ui';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -100,7 +100,8 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   const [deadlineTime, setDeadlineTime] = useState(editingHabit?.deadlineTime ?? '');
   const [isPrivate, setIsPrivate] = useState(src?.private ?? false);
   // A new habit added in the evening usually can't be done today (e.g. "Wake up at 5:30"): default to tomorrow.
-  const [startsTomorrow, setStartsTomorrow] = useState(new Date().getHours() >= 18);
+  const tomorrow = addDayStr(s.today, 1);
+  const [startsOn, setStartsOn] = useState(new Date().getHours() >= 18 ? tomorrow : s.today);
   // In its first hour a habit can still be fixed freely (server rule); after that its stakes and today are fixed.
   const fresh = !!editingHabit && Date.now() < Date.parse(editingHabit.freeEditUntil);
   const nowHHMM = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
@@ -114,7 +115,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
     const done = { onSuccess: () => { toast('Saved', 'good'); onDone(); }, onError: (e: Error) => toast(e.message, 'bad') };
     if (kind === 'habit') {
       if (!days) return toast('Pick at least one day', 'bad');
-      const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate, ...(editingHabit ? {} : { startsTomorrow }) };
+      const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate, ...(editingHabit ? {} : { startsOn }) };
       action.mutate(editingHabit ? { method: 'PUT', path: `/habits/${editingHabit.id}`, body } : { path: '/habits', body }, done);
     } else {
       const deadlineAt = editingQuest && deadline === toLocalInput(new Date(editingQuest.deadlineAt)) ? editingQuest.deadlineAt : new Date(deadline).toISOString();
@@ -202,18 +203,26 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
           </Field>
           {!editingHabit && (
             <Field label="Starts">
-              <div className="grid grid-cols-2 gap-1.5">
-                {([[false, 'Today'], [true, 'Tomorrow']] as const).map(([v, label]) => (
-                  <button key={label} type="button" onClick={() => setStartsTomorrow(v)} aria-pressed={startsTomorrow === v}
-                    className={`rounded-xl border py-2 text-sm font-bold transition ${startsTomorrow === v ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([[s.today, 'Today'], [tomorrow, 'Tomorrow']] as const).map(([v, label]) => (
+                  <button key={label} type="button" onClick={() => setStartsOn(v)} aria-pressed={startsOn === v}
+                    className={`rounded-xl border py-2 text-sm font-bold transition ${startsOn === v ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
                     {label}
                   </button>
                 ))}
+                {/* Any later day. The native picker would print the date in the phone's locale order, so it sits
+                    invisibly on top of our own dd-mm-yyyy label: tapping still opens the phone's date picker. */}
+                <label className={`relative flex items-center justify-center gap-1.5 rounded-xl border text-xs font-bold transition ${startsOn > tomorrow ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
+                  <CalendarDays size={14} /> {startsOn > tomorrow ? formatDate(startsOn) : 'Pick date'}
+                  <input type="date" aria-label="Start date" value={startsOn} min={s.today} max={addDayStr(s.today, 366)}
+                    onChange={(e) => e.target.value && setStartsOn(e.target.value)}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                </label>
               </div>
-              {!startsTomorrow && deadlineTime && deadlineTime <= nowHHMM ? (
+              {startsOn === s.today && deadlineTime && deadlineTime <= nowHHMM ? (
                 <p className="mt-1.5 text-xs font-semibold text-bad">It's already past {deadlineTime} today, so today would count as late. Start tomorrow?</p>
               ) : (
-                <p className="mt-1.5 text-xs text-muted">{startsTomorrow ? 'Nothing due today: its first day is tomorrow.' : 'Due today if today is one of its days.'}</p>
+                <p className="mt-1.5 text-xs text-muted">{startsOn === s.today ? 'Due today if today is one of its days.' : `Nothing due until ${formatDay(startsOn)}: that's its first day.`}</p>
               )}
             </Field>
           )}
