@@ -73,6 +73,7 @@ test('habit: create with several categories, see its days, open details, edit, c
   await expect(page.getByText('Repeats')).toBeVisible();
   await sheet().getByRole('button', { name: 'Edit' }).click();
   await expect(sheetTitle()).toHaveText('Edit habit');
+  await expect(sheet().getByRole('button', { name: /^Easy/ })).toBeDisabled(); // stakes are locked
   await sheet().locator('input.field').first().fill('Read 30 pages');
   await sheet().getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Read 30 pages')).toBeVisible();
@@ -85,21 +86,14 @@ test('habit: create with several categories, see its days, open details, edit, c
   await expect(edited.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
 });
 
-test('quest: the quest section Add opens on the Quest tab; type and difficulty can be edited; clearing pays XP', async () => {
+test('quest: the quest section Add opens on the Quest tab; clearing pays XP and credits', async () => {
   await page.getByText('No active quests').click();
   await expect(page.getByPlaceholder('Finish the API refactor')).toBeVisible();
   await page.getByPlaceholder('Finish the API refactor').fill('Pay the electricity bill');
   await button('Accept quest').click();
   const card = page.locator('div.glass', { hasText: 'Pay the electricity bill' }).first();
-  await expect(card.getByText('+25')).toBeVisible();
-  // Editing a quest can change its type and difficulty.
-  await card.getByRole('button', { name: 'Edit', exact: true }).click();
-  await sheet().getByRole('button', { name: /^Hard/ }).click();
-  await sheet().getByRole('button', { name: 'Boss ×3' }).click();
-  await sheet().getByRole('button', { name: 'Save' }).click();
-  await expect(card.getByText('+150')).toBeVisible();
   await card.getByRole('button', { name: 'Clear', exact: true }).click();
-  await expect(card.getByText('+150 XP')).toBeVisible();
+  await expect(card.getByText('+25 XP')).toBeVisible();
 });
 
 test('private quest is masked until unlocked with the password', async () => {

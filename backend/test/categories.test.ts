@@ -81,35 +81,19 @@ test('migration and old backups: single category_id becomes the list', async () 
   assert.equal((db.prepare('PRAGMA user_version').get() as any).user_version, 10);
 });
 
-test('editing a quest: type and difficulty change the stakes; Mega Boss keeps its weekly limit; chain parts follow', async () => {
+test('stakes are locked: a habit\'s difficulty and a quest\'s type/difficulty can\'t change after creation', async () => {
   const h = harness();
-  await h.boot();
+  let s = await h.boot();
+  s = await h.call('POST', '/api/habits', { title: 'Run', categoryIds: [], difficulty: 'hard' });
+  const habit = s.habits[0];
+  await assert.rejects(h.call('PUT', `/api/habits/${habit.id}`, { title: 'Run', categoryIds: [], difficulty: 'easy' }), { status: 409 });
+  s = await h.call('PUT', `/api/habits/${habit.id}`, { title: 'Run 5k', categoryIds: [], difficulty: 'hard' });
+  assert.deepEqual([s.habits[0].title, s.habits[0].difficulty], ['Run 5k', 'hard'], 'other fields still editable');
+
   const deadlineAt = new Date(Date.parse('2026-11-02T04:00:00Z') + 6 * 3600_000).toISOString();
-  const edit = (id: number, extra: object) => h.call('PUT', `/api/quests/${id}`, { title: 'Q', description: '', categoryIds: [], deadlineAt, ...extra });
-  let s = await h.call('POST', '/api/quests', { title: 'Q', categoryIds: [], difficulty: 'normal', deadlineAt, parts: [{ title: 'Q2', durationHours: 24 }] });
+  s = await h.call('POST', '/api/quests', { title: 'Q', categoryIds: [], difficulty: 'hard', boss: 'boss', deadlineAt });
   const q = s.quests[0];
-  assert.equal(q.xp, 25);
-
-  s = await edit(q.id, { difficulty: 'hard' });
-  assert.equal(s.quests[0].xp, 50, 'difficulty edit');
-  s = await edit(q.id, { boss: 'boss' });
-  assert.deepEqual([s.quests[0].boss, s.quests[0].xp], ['boss', 150], 'Hard boss ×3');
-  s = await edit(q.id, { boss: 'weekly' });
-  assert.equal(s.quests[0].boss, 'weekly');
-  assert.equal(s.weeklyBossAvailable, false, 'the edit takes this week\'s Mega Boss slot');
-  assert.equal(s.quests[0].xp, 50, 'Mega Boss XP is 25% of the next level (min 50)');
-
-  // A second quest can't also become this week's Mega Boss.
-  s = await h.call('POST', '/api/quests', { title: 'Other', categoryIds: [], difficulty: 'easy', deadlineAt });
-  const other = s.quests.find((x: any) => x.title === 'Other');
-  await assert.rejects(h.call('PUT', `/api/quests/${other.id}`, { title: 'Other', description: '', deadlineAt, boss: 'weekly' }), { status: 409 });
-
-  // Back to normal frees the slot and returns to difficulty-based XP.
-  s = await edit(q.id, { boss: 'none' });
-  assert.deepEqual([s.quests.find((x: any) => x.id === q.id).xp, s.weeklyBossAvailable], [50, true]);
-
-  // Locked chain part followed the latest stakes: it's a Hard normal quest now.
-  s = await h.call('POST', `/api/quests/${q.id}/complete`);
-  const part2 = s.quests.find((x: any) => x.title === 'Q2');
-  assert.deepEqual([part2.difficulty, part2.boss, part2.xp], ['hard', 'none', 50]);
+  // The edit endpoint has no stakes fields: extra ones are ignored.
+  s = await h.call('PUT', `/api/quests/${q.id}`, { title: 'Q', description: '', categoryIds: [], deadlineAt, difficulty: 'easy', boss: 'none' });
+  assert.deepEqual([s.quests[0].difficulty, s.quests[0].boss, s.quests[0].xp], ['hard', 'boss', 150]);
 });

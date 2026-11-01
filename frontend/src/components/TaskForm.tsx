@@ -61,15 +61,15 @@ export function CategoriesPicker({ s, value, onChange }: { s: AppState; value: n
   );
 }
 
-function DifficultyPicker({ value, onChange, multiplier = 1 }: { value: Difficulty; onChange: (d: Difficulty) => void; multiplier?: number }) {
+function DifficultyPicker({ value, onChange, multiplier = 1, locked = false }: { value: Difficulty; onChange: (d: Difficulty) => void; multiplier?: number; locked?: boolean }) {
   return (
     <div className="grid grid-cols-4 gap-1.5">
       {DIFFICULTIES.map((d) => {
         const st = DIFFICULTY_STYLE[d];
         const on = value === d;
         return (
-          <button key={d} type="button" onClick={() => onChange(d)}
-            className="rounded-xl border py-2 text-center transition"
+          <button key={d} type="button" onClick={() => onChange(d)} disabled={locked && !on}
+            className="rounded-xl border py-2 text-center transition disabled:opacity-30"
             style={{ borderColor: `color-mix(in srgb, ${st.color} ${on ? 90 : 25}%, transparent)`, background: on ? `color-mix(in srgb, ${st.color} 22%, transparent)` : 'transparent' }}>
             <div className="text-[11px] font-black uppercase tracking-wider" style={{ color: st.color }}>{st.label}</div>
             <div className="text-[10px] font-bold text-ink2">±{DIFFICULTY_XP[d] * multiplier}</div>
@@ -100,7 +100,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   const [isPrivate, setIsPrivate] = useState(src?.private ?? false);
   // quest
   const [deadline, setDeadline] = useState(toLocalInput(editingQuest ? new Date(editingQuest.deadlineAt) : endOfToday()));
-  const [boss, setBoss] = useState<'none' | 'boss' | 'weekly'>(editingQuest?.boss ?? 'none');
+  const [boss, setBoss] = useState<'none' | 'boss' | 'weekly'>('none');
   const [parts, setParts] = useState<{ title: string; durationHours: number }[]>([]);
 
   const submit = () => {
@@ -113,7 +113,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
     } else {
       const deadlineAt = new Date(deadline).toISOString();
       if (editingQuest) {
-        action.mutate({ method: 'PUT', path: `/quests/${editingQuest.id}`, body: { title, description, categoryIds, deadlineAt, private: isPrivate, difficulty, boss } }, done);
+        action.mutate({ method: 'PUT', path: `/quests/${editingQuest.id}`, body: { title, description, categoryIds, deadlineAt, private: isPrivate } }, done);
       } else {
         const cleanParts = parts.filter((p) => p.title.trim()).map((p) => ({ ...p, description: '' }));
         action.mutate({ path: '/quests', body: { title, description, categoryIds, difficulty, deadlineAt, boss, private: isPrivate, parts: cleanParts } }, done);
@@ -155,10 +155,13 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
       <Field label="Categories">
         <CategoriesPicker s={s} value={categoryIds} onChange={setCategoryIds} />
       </Field>
-      <Field label={`Difficulty — XP gained / lost${kind === 'quest' && boss === 'boss' ? ` (×${BOSS_MULTIPLIER} boss)` : ''}`}>
-        <DifficultyPicker value={difficulty} onChange={setDifficulty} multiplier={kind === 'quest' && boss === 'boss' ? BOSS_MULTIPLIER : 1} />
-        {kind === 'quest' && boss === 'weekly' && <p className="mt-1.5 text-xs text-muted">A Mega Boss's XP comes from your level, not the difficulty.</p>}
-      </Field>
+      {/* Stakes are set once: an existing quest hides them, an existing habit shows them locked. */}
+      {!editingQuest && (
+        <Field label={`Difficulty — XP gained / lost${kind === 'quest' && boss === 'boss' ? ` (×${BOSS_MULTIPLIER} boss)` : ''}`}>
+          <DifficultyPicker value={difficulty} onChange={setDifficulty} multiplier={kind === 'quest' && boss === 'boss' ? BOSS_MULTIPLIER : 1} locked={!!editingHabit} />
+          {editingHabit && <p className="mt-1.5 text-xs text-muted">Locked once a habit is created, so the stakes can't be lowered before a fail.</p>}
+        </Field>
+      )}
 
       {kind === 'habit' ? (
         <>
@@ -188,24 +191,23 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
           <Field label="Deadline">
             <input type="datetime-local" className="field" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
           </Field>
-          <Field label="Type">
-            <div className="grid grid-cols-3 gap-1.5">
-              {([['none', 'Normal', Swords], ['boss', `Boss ×${BOSS_MULTIPLIER}`, Skull], ['weekly', 'Mega Boss', Crown]] as const).map(([v, label, Icon]) => {
-                // This quest already being the Mega Boss doesn't block keeping it one.
-                const disabled = v === 'weekly' && !s.weeklyBossAvailable && editingQuest?.boss !== 'weekly';
-                return (
-                  <button key={v} type="button" disabled={disabled} onClick={() => setBoss(v)}
-                    className={`flex items-center justify-center gap-1 rounded-xl border py-2 text-xs font-bold transition disabled:opacity-30 ${boss === v ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
-                    <Icon size={13} /> {label}
-                  </button>
-                );
-              })}
-            </div>
-            {boss === 'weekly' && <p className="mt-1.5 text-xs text-muted">Worth ±25% of the XP you need for your next level. One per week.</p>}
-            {!s.weeklyBossAvailable && editingQuest?.boss !== 'weekly' && <p className="mt-1.5 text-xs text-muted">This week's Mega Boss is already set.</p>}
-          </Field>
           {!editingQuest && (
             <>
+              <Field label="Type">
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([['none', 'Normal', Swords], ['boss', `Boss ×${BOSS_MULTIPLIER}`, Skull], ['weekly', 'Mega Boss', Crown]] as const).map(([v, label, Icon]) => {
+                    const disabled = v === 'weekly' && !s.weeklyBossAvailable;
+                    return (
+                      <button key={v} type="button" disabled={disabled} onClick={() => setBoss(v)}
+                        className={`flex items-center justify-center gap-1 rounded-xl border py-2 text-xs font-bold transition disabled:opacity-30 ${boss === v ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
+                        <Icon size={13} /> {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {boss === 'weekly' && <p className="mt-1.5 text-xs text-muted">Worth ±25% of the XP you need for your next level. One per week.</p>}
+                {!s.weeklyBossAvailable && <p className="mt-1.5 text-xs text-muted">This week's Mega Boss is already set.</p>}
+              </Field>
               <Field label="Chain — follow-up parts (optional)">
                 {parts.map((p, i) => (
                   <div key={i} className="mb-2 flex gap-2">

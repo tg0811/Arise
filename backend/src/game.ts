@@ -238,26 +238,6 @@ export function weeklyBossAvailable(ctx: Ctx): boolean {
   return row.n === 0;
 }
 
-/**
- * Change a pending quest's type and/or difficulty. The chain's locked parts follow (they're never Mega Bosses).
- * Turning a quest into a Mega Boss takes this week's slot and freezes its XP now; turning one back frees it.
- */
-export function setQuestStakes(ctx: Ctx, q: Task, boss: Task['boss'], difficulty: Difficulty) {
-  let xpValue = q.xp_value;
-  let createdDate = q.created_date;
-  if (boss === 'weekly' && q.boss !== 'weekly') {
-    if (!weeklyBossAvailable(ctx)) throw new HttpError(409, 'This week already has a Mega Boss');
-    xpValue = weeklyBossXp(levelFromXp(totalXp(ctx.db)).need);
-    createdDate = today(ctx); // the weekly slot is counted by creation date
-  }
-  if (boss !== 'weekly') xpValue = null;
-  ctx.db.prepare('UPDATE tasks SET boss = ?, difficulty = ?, xp_value = ?, created_date = ? WHERE id = ?').run(boss, difficulty, xpValue, createdDate, q.id);
-  if (q.chain_id) {
-    ctx.db.prepare("UPDATE tasks SET boss = ?, difficulty = ? WHERE chain_id = ? AND chain_index > ? AND status = 'locked'")
-      .run(boss === 'weekly' ? 'none' : boss, difficulty, q.chain_id, q.chain_index);
-  }
-}
-
 export function createQuest(ctx: Ctx, q: NewQuest): number {
   return tx(ctx.db, () => {
     if (new Date(q.deadlineAt) <= ctx.at) throw new HttpError(400, 'Deadline must be in the future');
