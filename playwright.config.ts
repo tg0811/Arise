@@ -1,12 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Browser smoke test: the production build on a throwaway database, never your real data.
 // Run with `npm run test:e2e` (builds the frontend first).
 const PORT = 8790;
-const dataDir = mkdtempSync(join(tmpdir(), 'arise-e2e-'));
+// One fixed folder (git-ignored, never deployed), emptied at the start of each run so nothing piles up in /tmp.
+// Workers load this file too: only the main process may wipe it, or it would vanish under the running server.
+const dataDir = join(import.meta.dirname, 'test-results', 'e2e-db');
+if (!process.env.TEST_WORKER_INDEX) {
+  rmSync(dataDir, { recursive: true, force: true });
+  mkdirSync(dataDir, { recursive: true });
+}
 import { E2E_PASSWORD } from './e2e/env';
 
 export default defineConfig({
