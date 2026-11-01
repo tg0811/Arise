@@ -12,6 +12,7 @@ test('1. deleting a habit that is still due today counts as today\'s fail', asyn
   s = await h.call('POST', '/api/habits', { title: 'Due', difficulty: 'hard' });
   s = await h.call('POST', '/api/habits', { title: 'Done already', difficulty: 'hard' });
   const [due, done] = s.habits;
+  h.advance(1.5); // past the free first hour, same day
   s = await h.call('POST', `/api/habits/${done.id}/complete`);
   assert.equal(s.progress.totalXp, 50);
   s = await h.call('DELETE', `/api/habits/${done.id}`);
@@ -27,6 +28,7 @@ test('2. unticking today in "Repeats on" applies from tomorrow: today still fail
   let s = await h.boot();
   s = await h.call('POST', '/api/habits', { title: 'Run', difficulty: 'normal', days: '0123456' });
   const id = s.habits[0].id;
+  h.advance(1.5); // past the free first hour, same day
   s = await h.call('PUT', `/api/habits/${id}`, { title: 'Run', difficulty: 'normal', days: '0' }); // Sundays only; today is Monday
   assert.equal(s.habits[0].scheduledToday, true, 'still due today');
   h.advance(24); // past midnight: Tuesday
@@ -102,4 +104,36 @@ test('5b. removing a goal is free in its first hour or once its penalty is paid;
   const notes = (await h.call('GET', '/api/archive')).history.flatMap((d: any) => d.events).map((e: any) => e.note);
   assert.ok(notes.includes('Goal deadline missed: Late'), 'the deadline penalty was charged');
   assert.equal(notes.includes('Goal abandoned: Late'), false, 'no second penalty on removal');
+});
+
+test('a new habit can start tomorrow: not due today, no fail tonight, due from tomorrow', async () => {
+  const h = harness('2026-11-01T17:00:00Z'); // Sunday 22:30 IST: "Wake up at 5:30" added at night
+  let s = await h.boot();
+  s = await h.call('POST', '/api/habits', { title: 'Wake up at 5:30', difficulty: 'hard', deadlineTime: '05:30', startsTomorrow: true });
+  const w = s.habits[0];
+  assert.deepEqual([w.scheduledToday, w.startsOn], [false, '2026-11-02']);
+  assert.equal(s.streak.today.total, 0, 'not in today\'s count');
+  await assert.rejects(h.call('POST', `/api/habits/${w.id}/complete`), { status: 400 }, 'can\'t be completed early');
+
+  h.advance(8); // Monday 06:30
+  s = await h.call('GET', '/api/state');
+  assert.equal(s.progress.totalXp, 0, 'Sunday did not fail');
+  assert.equal(s.habits[0].scheduledToday, true, 'due from Monday');
+  s = await h.call('POST', `/api/habits/${w.id}/complete`);
+  assert.equal(s.progress.totalXp, 50);
+});
+
+test('in its first hour a habit can be fixed freely: delete with no fail, change difficulty and days now', async () => {
+  const h = harness();
+  let s = await h.boot();
+  s = await h.call('POST', '/api/habits', { title: 'Oops', difficulty: 'hard' });
+  const oops = s.habits[0];
+  assert.equal(oops.freeEditUntil, '2026-11-02T05:00:00.000Z');
+  s = await h.call('PUT', `/api/habits/${oops.id}`, { title: 'Oops', difficulty: 'easy', days: '0' });
+  assert.deepEqual([s.habits[0].difficulty, s.habits[0].scheduledToday], ['easy', false], 'days change takes effect today');
+  s = await h.call('POST', '/api/habits', { title: 'Wrong one', difficulty: 'hard' });
+  s = await h.call('DELETE', `/api/habits/${s.habits.find((x: any) => x.title === 'Wrong one').id}`);
+  assert.equal(s.progress.totalXp, 0);
+  const a = await h.call('GET', '/api/archive');
+  assert.equal(a.history.length, 0, 'no fail recorded');
 });

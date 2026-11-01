@@ -6,6 +6,8 @@ export interface Category { id: number; name: string; color: string; icon: strin
 export interface Habit {
   id: number; title: string; description: string; /** Every category it trains (full XP to each). */ categoryIds: number[]; difficulty: Difficulty;
   days: string; deadlineTime: string | null; scheduledToday: boolean;
+  /** First day it counts (YYYY-MM-DD; tomorrow if created with "starts tomorrow"). Until `freeEditUntil` it can be fixed freely. */
+  startsOn: string; freeEditUntil: string;
   /** Private habit; `masked` while this device hasn't unlocked (title/description/category hidden). */
   private: boolean; masked: boolean;
   log: { status: 'done' | 'failed'; xp: number } | null;

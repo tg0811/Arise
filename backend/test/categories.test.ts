@@ -86,6 +86,7 @@ test('stakes are locked: a habit\'s difficulty and a quest\'s type/difficulty ca
   let s = await h.boot();
   s = await h.call('POST', '/api/habits', { title: 'Run', categoryIds: [], difficulty: 'hard' });
   const habit = s.habits[0];
+  h.advance(1.5); // past the free first hour
   await assert.rejects(h.call('PUT', `/api/habits/${habit.id}`, { title: 'Run', categoryIds: [], difficulty: 'easy' }), { status: 409 });
   s = await h.call('PUT', `/api/habits/${habit.id}`, { title: 'Run 5k', categoryIds: [], difficulty: 'hard' });
   assert.deepEqual([s.habits[0].title, s.habits[0].difficulty], ['Run 5k', 'hard'], 'other fields still editable');

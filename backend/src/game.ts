@@ -88,6 +88,7 @@ export interface Task {
   archived: number;
   sort: number;
   created_at: string;
+  /** For habits: the first day it counts (today, or tomorrow when created with "starts tomorrow"). */
   created_date: string;
   private: number;
 }
@@ -155,8 +156,15 @@ export function totalXp(db: DB): number {
 
 // ---------------------------------------------------------------- habits
 
-/** Is the habit due on `date`? Its weekdays, plus the day its weekdays were changed (changes apply from tomorrow). */
-export const habitDue = (h: Pick<Task, 'days' | 'kept_date'>, date: string) => isScheduled(h.days, date) || h.kept_date === date;
+/**
+ * Is the habit due on `date`? Only from its start day; then its weekdays, plus the day its weekdays were
+ * changed (changes apply from tomorrow).
+ */
+export const habitDue = (h: Pick<Task, 'days' | 'kept_date' | 'created_date'>, date: string) =>
+  date >= h.created_date && (isScheduled(h.days, date) || h.kept_date === date);
+
+/** A habit, quest or goal in its first FREE_REMOVE_MINUTES: mistakes can be fixed without penalty. */
+export const isFresh = (createdAt: string, now: Date) => now.toISOString() < freeRemoveUntil(createdAt);
 
 /** Consecutive completed scheduled days strictly before `date`. */
 export function habitStreakBefore(db: DB, habit: Task, date: string): number {
@@ -211,12 +219,12 @@ export function failHabit(ctx: Ctx, id: number) {
 
 /**
  * Delete (archive) a habit. If it's still due today and unresolved, today counts as failed first:
- * deleting isn't a way out of today's penalty.
+ * deleting isn't a way out of today's penalty. Free in its first hour (a mistake, not a dodge).
  */
 export function archiveHabit(ctx: Ctx, habit: Task) {
   tx(ctx.db, () => {
     const date = today(ctx);
-    if (habitDue(habit, date) && habit.created_date <= date && !getHabitLog(ctx.db, habit.id, date)) {
+    if (!isFresh(habit.created_at, ctx.at) && habitDue(habit, date) && !getHabitLog(ctx.db, habit.id, date)) {
       insertHabitLog(ctx, habit, date, 'failed', -DIFFICULTY_XP[habit.difficulty], false);
     }
     ctx.db.prepare('UPDATE tasks SET archived = 1 WHERE id = ?').run(habit.id);
@@ -524,6 +532,7 @@ export function buildState(ctx: Ctx) {
     return {
       ...maskTask(ctx, h),
       days: h.days, deadlineTime: h.deadline_time, scheduledToday: habitDue(h, todayStr),
+      startsOn: h.created_date, freeEditUntil: freeRemoveUntil(h.created_at),
       log: log ? { status: log.status, xp: log.xp } : null,
       streak, multiplier: nextMultiplier,
       xpGain: Math.round(DIFFICULTY_XP[h.difficulty] * nextMultiplier), xpLoss: DIFFICULTY_XP[h.difficulty],

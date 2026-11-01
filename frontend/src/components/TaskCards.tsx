@@ -10,7 +10,7 @@ import { CategoryIcon, useToast } from './ui';
 import { sfx } from '../lib/sound';
 import { Countdown } from './Countdown';
 import { Button } from './ui';
-import { daysLabel } from '../lib/time';
+import { daysLabel, formatDateTime, formatDay } from '../lib/time';
 
 /** One chip per category, in the order they were picked. */
 function CategoryChips({ s, ids }: { s: AppState; ids: number[] }) {
@@ -248,7 +248,6 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 /** What a tapped habit or quest shows: everything about it, plus Edit. */
 export function TaskDetail({ s, task, onEdit }: { s: AppState; task: { kind: 'habit'; h: Habit } | { kind: 'quest'; q: Quest }; onEdit: () => void }) {
   const t = task.kind === 'habit' ? task.h : task.q;
-  const deadline = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   return (
     <div>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -265,14 +264,15 @@ export function TaskDetail({ s, task, onEdit }: { s: AppState; task: { kind: 'ha
         {task.kind === 'habit' ? (
           <>
             <Fact label="Repeats">{daysLabel(task.h.days)}</Fact>
+            {task.h.startsOn > s.today && <Fact label="Starts">{formatDay(task.h.startsOn)}</Fact>}
             <Fact label="Deadline">{task.h.deadlineTime ? `by ${task.h.deadlineTime}` : 'End of day'}</Fact>
             <Fact label="Streak"><span className="inline-flex items-center gap-1"><Flame size={13} className="text-gold" />{task.h.streak} day{task.h.streak === 1 ? '' : 's'}</span>{task.h.multiplier > 1 && <span className="ml-1.5 text-accent2">×{task.h.multiplier}</span>}</Fact>
             <Fact label="XP"><span className="text-good">+{task.h.xpGain}</span> / <span className="text-bad">−{task.h.xpLoss}</span></Fact>
-            <Fact label="Today">{!task.h.scheduledToday ? 'Rest day' : task.h.log ? (task.h.log.status === 'done' ? <span className="text-good">Done</span> : <span className="text-bad">Failed</span>) : 'Not done yet'}</Fact>
+            <Fact label="Today">{task.h.startsOn > s.today ? 'Not started yet' : !task.h.scheduledToday ? 'Rest day' : task.h.log ? (task.h.log.status === 'done' ? <span className="text-good">Done</span> : <span className="text-bad">Failed</span>) : 'Not done yet'}</Fact>
           </>
         ) : (
           <>
-            <Fact label="Deadline">{deadline(task.q.deadlineAt)}</Fact>
+            <Fact label="Deadline">{formatDateTime(task.q.deadlineAt)}</Fact>
             <Fact label="Time left">{task.q.status === 'pending' ? <Countdown to={task.q.deadlineAt} /> : <span className={task.q.status === 'done' ? 'text-good' : 'text-bad'}>{task.q.status === 'done' ? 'Cleared' : 'Failed'}</span>}</Fact>
             <Fact label="XP"><span className="text-good">+{task.q.xp}</span> / <span className="text-bad">−{task.q.xp}</span></Fact>
             <Fact label="Credits">+{task.q.credits}</Fact>

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { CheckCircle2, Swords, Flame, Skull, Trophy, Coins, Gem, ShoppingBag, Sparkles, XCircle, ScrollText, Gift, Loader2, Lock, LockOpen } from 'lucide-react';
 import { useArchive, type AppState, type Archive as ArchiveData, type DayStat, type HabitStreak, type HistoryEvent } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
-import { formatDate } from '../lib/time';
+import { formatDate, formatDay } from '../lib/time';
 import { Heatmap, WeekXpChart } from '../components/charts';
 import { CategoryIcon, Panel, SectionTitle, Tabs } from '../components/ui';
 
@@ -62,7 +62,7 @@ function Overview({ s, a }: { s: AppState; a: ArchiveData }) {
       <SectionTitle>Record</SectionTitle>
       <Panel brackets={false} className="divide-y divide-line">
         {[
-          ['Days active', o.daysActive, o.firstDay ? `since ${formatDate(o.firstDay + 'T12:00:00')}` : ''],
+          ['Days active', o.daysActive, o.firstDay ? `since ${formatDate(o.firstDay)}` : ''],
           ['Quests cleared', o.questsCleared, ''],
           ['Goals conquered', o.goalsConquered, ''],
           ['Payloads opened', o.payloadsOpened, ''],
@@ -102,7 +102,7 @@ function History({ s, days, more, loading, onMore }: {
         <Panel key={d.date} brackets={false} className="p-4">
           <div className="mb-2 flex items-baseline justify-between gap-3">
             <span className="font-display text-base font-bold tracking-wider">
-              {new Date(d.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}
+              {formatDay(d.date, 'long')}
             </span>
             <span className="shrink-0 text-xs text-ink2">
               {d.total > 0 && <>{d.done}/{d.total} · </>}

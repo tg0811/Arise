@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, Flame, Trophy, Clock, X } from 'lucide-react';
 import { useGate, type Gate } from '../../lib/api';
 import { Panel, SectionTitle } from '../../components/ui';
+import { formatDay } from '../../lib/time';
 
 const WEEK_STYLE: Record<Gate['streak']['weeks'][number]['status'], { cls: string; mark: string; label: string }> = {
   complete: { cls: 'bg-good/25 text-good', mark: '✓', label: 'Every workout done' },
@@ -14,7 +15,7 @@ export function GateHistory() {
   const { data: g } = useGate();
   const [open, setOpen] = useState<number | null>(null);
   if (!g) return null;
-  const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  const fmt = (d: string) => formatDay(d);
 
   return (
     <div>

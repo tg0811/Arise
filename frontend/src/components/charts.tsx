@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DAY_CLEAR_RATIO } from '@shared';
 import type { DayStat } from '../lib/api';
+import { formatDay, weekdayName } from '../lib/time';
 
 // Charts for the Archive. Built from plain HTML so they inherit the app's fonts and themes.
 // Colour jobs: heatmap = sequential (one blue hue, brighter = more done);
@@ -9,8 +10,7 @@ import type { DayStat } from '../lib/api';
 const GAIN = '#3b82f6';
 const LOSS = '#ef4444';
 
-const dayLabel = (date: string, opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }) =>
-  new Date(date + 'T12:00:00').toLocaleDateString(undefined, opts);
+const dayLabel = (date: string) => formatDay(date);
 
 const Swatch = ({ color }: { color: string }) => <span className="inline-block h-2 w-2 rounded-sm align-middle" style={{ background: color }} />;
 
@@ -130,7 +130,7 @@ export function WeekXpChart({ days }: { days: DayStat[] }) {
       <div className="mt-1.5 flex pl-8">
         {days.map((d) => (
           <span key={d.date} className={`flex-1 text-center text-[11px] font-bold ${sel.date === d.date ? 'text-ink' : 'text-muted'}`}>
-            {dayLabel(d.date, { weekday: 'narrow' })}
+            {weekdayName(d.date, 'narrow')}
           </span>
         ))}
       </div>

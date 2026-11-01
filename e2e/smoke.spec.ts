@@ -51,6 +51,7 @@ test('awakening needs a full name and a valid username', async () => {
   await button('I accept').click();
   await expect(page.getByText('Daily Habits')).toBeVisible();
   await expect(page.locator('header h1')).toHaveText('shadow_monarch');
+  await expect(page.getByText(/^\w+, \d{2}-\d{2}-\d{4}$/)).toBeVisible(); // dates are dd-mm-yyyy
 });
 
 test('habit: create with several categories, see its days, open details, edit, complete and undo', async () => {
@@ -61,6 +62,7 @@ test('habit: create with several categories, see its days, open details, edit, c
   await sheet().getByRole('button', { name: 'Intellect', exact: true }).click();
   await expect(sheet().getByRole('button', { name: 'Intellect', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await expect(sheet().getByText('Trains 2 attributes')).toBeVisible();
+  await sheet().getByRole('button', { name: 'Today', exact: true }).click(); // after 18:00 it defaults to Tomorrow
   await button('Create habit').click();
   const card = page.locator('div.glass', { hasText: 'Read 20 pages' }).first();
   await expect(card.getByText('Every day')).toBeVisible();
@@ -73,7 +75,9 @@ test('habit: create with several categories, see its days, open details, edit, c
   await expect(page.getByText('Repeats')).toBeVisible();
   await sheet().getByRole('button', { name: 'Edit' }).click();
   await expect(sheetTitle()).toHaveText('Edit habit');
-  await expect(sheet().getByRole('button', { name: /^Easy/ })).toBeDisabled(); // stakes are locked
+  // Brand new: still changeable in its first hour (it locks after that; covered by the backend tests).
+  await expect(sheet().getByRole('button', { name: /^Easy/ })).toBeEnabled();
+  await expect(sheet().getByText(/Still changeable until \w+ \d{2}-\d{2}-\d{4}/)).toBeVisible();
   await sheet().locator('input.field').first().fill('Read 30 pages');
   await sheet().getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Read 30 pages')).toBeVisible();
@@ -84,6 +88,14 @@ test('habit: create with several categories, see its days, open details, edit, c
   await expect(page.getByRole('button', { name: 'Close' })).toHaveCount(0); // Complete must not open the card
   await edited.getByRole('button', { name: 'Undo' }).click();
   await expect(edited.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
+});
+
+test('habit that starts tomorrow is not due today and says when it starts', async () => {
+  await page.getByLabel('Add', { exact: true }).click();
+  await page.getByPlaceholder('Sleep by 22:30').fill('Wake up at 5:30');
+  await sheet().getByRole('button', { name: 'Tomorrow', exact: true }).click();
+  await button('Create habit').click();
+  await expect(page.getByRole('button', { name: /Wake up at 5:30 · starts \d{2}-\d{2}-\d{4}/ })).toBeVisible();
 });
 
 test('quest: the quest section Add opens on the Quest tab; clearing pays XP and credits', async () => {

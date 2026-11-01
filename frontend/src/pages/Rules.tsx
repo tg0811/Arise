@@ -84,6 +84,7 @@ export function Rules({ s }: { s: AppState }) {
         <Rule>What you can gain, you can lose. A task's fail costs exactly its base XP.</Rule>
         <Rule><b className="text-ink">Stakes are set once.</b> A habit's difficulty, a quest's difficulty and type, and a goal's XP can't be changed after you create them, so nothing can be lowered right before a fail.</Rule>
         <Rule><b className="text-ink">No escape hatches.</b> Deadlines of quests and goals can only move earlier. Changing a habit's weekdays applies from tomorrow, and deleting a habit that's still due today counts as today's fail.</Rule>
+        <Rule><b className="text-ink">Mistakes are free to fix in the first {FREE_REMOVE_MINUTES} minutes.</b> A new habit can be deleted, or its difficulty and days changed, without penalty in its first hour. A habit added at night can <b className="text-ink">start tomorrow</b>, so it's never due on a day it can't be done.</Rule>
         <Rule>Credits are earned on completion only (XP ÷ 5) and are never taken away. Spend them in the Store.</Rule>
       </ul>
 

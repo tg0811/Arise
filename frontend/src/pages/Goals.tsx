@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Castle, Hammer, Swords, Plus, Pencil, Trophy, Undo2, Trash2, Clock, ScrollText, NotebookPen, ChevronDown } from 'lucide-react';
 import { GOAL_LATE_SHARE, GOAL_SIZES, GOAL_TYPES, JOURNAL_AAR_XP, creditsFor, type GoalType } from '@shared';
 import { useAction, type AppState, type Goal, type JournalEntry } from '../lib/api';
-import { formatDate, toLocalInput } from '../lib/time';
+import { formatDate, formatDateTime, toLocalInput } from '../lib/time';
 import { Countdown } from '../components/Countdown';
 import { CategoriesPicker, Field } from '../components/TaskForm';
 import { Button, CategoryIcon, Panel, SectionTitle, Sheet, Tabs, useToast } from '../components/ui';
@@ -215,6 +215,7 @@ function GoalForm({ s, goal, onDone }: { s: AppState; goal: Goal | null; onDone:
       </Field>
       <Field label="Deadline">
         <input type="datetime-local" className="field" value={deadline} disabled={locked} onChange={(e) => setDeadline(e.target.value)} max={original ?? undefined} />
+        {deadline && <p className="mt-1.5 text-xs text-ink2">Due {formatDateTime(new Date(deadline))}</p>}
         {locked ? <p className="mt-1.5 text-xs text-bad">Deadline has passed, so it's locked.</p>
           : goal && <p className="mt-1.5 text-xs text-muted">Can only move earlier, never later.</p>}
       </Field>

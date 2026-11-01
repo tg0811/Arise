@@ -8,6 +8,7 @@ import { api, useAction, type AppState, type Category } from '../lib/api';
 import { Avatar, resizeImage } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
 import { LOCK_AFTER_MINUTES, USERNAME_RE } from '@shared';
+import { formatDate } from '../lib/time';
 import { devicePasskeyId, forgetDevicePasskey, passkeysSupported, setUpPasskey } from '../lib/passkey';
 import { Button, CATEGORY_ICONS, CategoryIcon, Panel, SectionTitle, Sheet, useToast } from '../components/ui';
 
@@ -257,7 +258,7 @@ function AppLock({ s }: { s: AppState }) {
                 <li key={p.id} className="flex items-center gap-2 text-sm">
                   <Fingerprint size={14} className="text-muted" />
                   <span className="flex-1">{p.name}{p.id === here && <span className="text-muted"> (this device)</span>}
-                    <span className="block text-xs text-muted">Added {new Date(p.createdAt).toLocaleDateString()}{p.lastUsedAt && ` · last used ${new Date(p.lastUsedAt).toLocaleDateString()}`}</span>
+                    <span className="block text-xs text-muted">Added {formatDate(p.createdAt)}{p.lastUsedAt && ` · last used ${formatDate(p.lastUsedAt)}`}</span>
                   </span>
                   <button onClick={() => remove(p.id, p.name)} className="rounded-lg p-1.5 text-muted hover:text-bad" aria-label={`Remove passkey ${p.name}`}><Trash2 size={14} /></button>
                 </li>

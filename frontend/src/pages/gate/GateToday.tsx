@@ -6,6 +6,7 @@ import { useGate, useGateAction, type Gate, type GateExercise, type GateSession,
 import { sfx } from '../../lib/sound';
 import { Button, Panel, Sheet, useToast } from '../../components/ui';
 import { ExercisePicker, KindIcon, WEEKDAY_NAMES, targetText } from './shared';
+import { weekdayName } from '../../lib/time';
 
 const REST_SECONDS = 90;
 
@@ -39,7 +40,7 @@ function WeekStrip({ g }: { g: Gate }) {
         return (
           <div key={d.date} title={`${WEEKDAY_NAMES[new Date(d.date + 'T12:00:00').getDay()]}: ${d.name || st.label} (${st.label})`}
             className={`flex flex-col items-center rounded-xl border py-2 ${st.cls} ${d.isToday ? 'ring-2 ring-accent ring-offset-2 ring-offset-bg' : ''}`}>
-            <span className="text-[10px] font-black uppercase tracking-wider opacity-80">{new Date(d.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'narrow' })}</span>
+            <span className="text-[10px] font-black uppercase tracking-wider opacity-80">{weekdayName(d.date, 'narrow')}</span>
             <span className="text-base font-bold leading-tight">{st.mark}</span>
           </div>
         );

@@ -6,7 +6,7 @@ import { PrivateUnlockedBar } from '../components/Private';
 import { LootboxButton } from '../components/Lootbox';
 import { Countdown } from '../components/Countdown';
 import { DAY_CLEAR_RATIO } from '@shared';
-import { daysLabel } from '../lib/time';
+import { daysLabel, formatDate, formatDay } from '../lib/time';
 import type { AppState, Habit } from '../lib/api';
 import { HabitCard, QuestCard, TaskDetail } from '../components/TaskCards';
 import { TaskForm } from '../components/TaskForm';
@@ -34,7 +34,7 @@ export function Today({ s }: { s: AppState }) {
   const sheetOpen = editing?.kind === 'new' || !!openHabit || !!openQuest;
   const sheetTitle = editing?.kind === 'new' ? 'New task'
     : `${editing && 'edit' in editing && editing.edit ? 'Edit ' : ''}${editing?.kind === 'habit' ? 'habit' : 'quest'}`.replace(/^./, (c) => c.toUpperCase());
-  const date = new Date(s.today + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const date = formatDay(s.today, 'long');
 
   return (
     <div className="pt-2">
@@ -122,7 +122,7 @@ export function Today({ s }: { s: AppState }) {
             {restHabits.map((h) => (
               <button key={h.id} onClick={() => setEditing({ kind: 'habit', id: h.id, edit: false })}
                 className="glass inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm text-ink2">
-                <Moon size={13} /> {h.title} <span className="text-xs text-muted">· {daysLabel(h.days)}</span>
+                <Moon size={13} /> {h.title} <span className="text-xs text-muted">· {h.startsOn > s.today ? `starts ${formatDate(h.startsOn)}` : daysLabel(h.days)}</span>
               </button>
             ))}
           </div>

@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronRight } from 'lucide-react';
 import { useGate, useGateAction, type ExerciseKind, type Gate, type GateExercise } from '../../lib/api';
 import { Button, Panel, SectionTitle, Sheet, useToast } from '../../components/ui';
 import { ExercisePicker, KIND_VIEW, KindIcon } from './shared';
+import { formatDate } from '../../lib/time';
 
 // The exercise library: PRs and a progress chart per exercise.
 
@@ -123,7 +124,7 @@ function ProgressChart({ points, unit, label }: { points: { date: string; v: num
   const y = (v: number) => H - PAD - ((v - min) / span) * (H - PAD * 2);
   const path = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
   const active = points[sel ?? points.length - 1];
-  const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const fmt = (d: string) => formatDate(d);
 
   return (
     <div className="mt-2">

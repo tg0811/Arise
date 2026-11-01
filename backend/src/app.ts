@@ -9,9 +9,9 @@ import {
 } from './auth.ts';
 import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
-  archiveHabit, getProfile, getTask, habitDue, logWeight, settle, today, undoHabit, undoQuest, type Ctx,
+  archiveHabit, getProfile, getTask, habitDue, isFresh, logWeight, settle, today, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, isScheduled, localDate } from '../../shared/engine.ts';
+import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, addDays, isScheduled, localDate } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
 import {
   authenticationOptions, deletePasskey, isUnlocked, lockEnabled, lockNow, registerPasskey, registrationOptions,
@@ -70,6 +70,8 @@ const HabitBody = z.object({
   days: z.string().regex(/^[0-6]{1,7}$/).default('0123456'),
   deadlineTime: hhmm.nullable().default(null),
   private: z.boolean().default(false),
+  /** On create: first day is tomorrow (e.g. a morning habit added at night). */
+  startsTomorrow: z.boolean().default(false),
 });
 
 const QuestBody = z.object({
@@ -357,9 +359,10 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const b = HabitBody.parse(await c.req.json());
     const at = clock();
     const cats = categoriesOf(b);
+    const start = localDate(getProfile(db).timezone, at);
     db.prepare(`INSERT INTO tasks (kind, title, description, category_id, category_ids, difficulty, days, deadline_time, private, created_at, created_date)
       VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), localDate(getProfile(db).timezone, at));
+      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), b.startsTomorrow ? addDays(start, 1) : start);
     return c.json(state(c));
   });
 
@@ -369,12 +372,13 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     if (h.kind !== 'habit') throw new HttpError(404, 'Habit not found');
     // A locked private habit can't be edited: the form would only have the mask to save back.
     if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
-    // Stakes are fixed at creation (like a quest's): no dropping to Easy right before a fail.
-    if (b.difficulty !== h.difficulty) throw new HttpError(409, 'Difficulty is locked once a habit is created');
+    // In its first hour a new habit can still be fixed freely. After that: stakes are fixed (no dropping to Easy
+    // right before a fail), and new weekdays apply from tomorrow (unticking today can't erase a due habit).
+    const fresh = isFresh(h.created_at, clock());
+    if (!fresh && b.difficulty !== h.difficulty) throw new HttpError(409, 'Difficulty is locked once a habit is created');
     const cats = categoriesOf(b);
-    // New weekdays apply from tomorrow: unticking today can't erase a habit that's due and unresolved.
     const date = today(ctx(c));
-    const keep = habitDue(h, date) && !isScheduled(b.days, date) && !db.prepare('SELECT 1 FROM habit_logs WHERE task_id = ? AND date = ?').get(h.id, date);
+    const keep = !fresh && habitDue(h, date) && !isScheduled(b.days, date) && !db.prepare('SELECT 1 FROM habit_logs WHERE task_id = ? AND date = ?').get(h.id, date);
     db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, category_ids = ?, difficulty = ?, days = ?, deadline_time = ?, private = ?, kept_date = ? WHERE id = ?')
       .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, keep ? date : h.kept_date, h.id);
     return c.json(state(c));

@@ -3,7 +3,7 @@ import { Plus, Trash2, Repeat, Swords, Skull, Crown, Lock } from 'lucide-react';
 import { DIFFICULTIES, DIFFICULTY_XP, BOSS_MULTIPLIER, type Difficulty } from '@shared';
 import { useAction, type AppState, type Habit, type Quest } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
-import { toLocalInput } from '../lib/time';
+import { formatDateTime, toLocalInput } from '../lib/time';
 import { Button, CategoryIcon, useToast } from './ui';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -98,6 +98,11 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   const [days, setDays] = useState(editingHabit?.days ?? '0123456');
   const [deadlineTime, setDeadlineTime] = useState(editingHabit?.deadlineTime ?? '');
   const [isPrivate, setIsPrivate] = useState(src?.private ?? false);
+  // A new habit added in the evening usually can't be done today (e.g. "Wake up at 5:30"): default to tomorrow.
+  const [startsTomorrow, setStartsTomorrow] = useState(new Date().getHours() >= 18);
+  // In its first hour a habit can still be fixed freely (server rule); after that its stakes and today are fixed.
+  const fresh = !!editingHabit && Date.now() < Date.parse(editingHabit.freeEditUntil);
+  const nowHHMM = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
   // quest
   const [deadline, setDeadline] = useState(toLocalInput(editingQuest ? new Date(editingQuest.deadlineAt) : endOfToday()));
   const [boss, setBoss] = useState<'none' | 'boss' | 'weekly'>('none');
@@ -108,7 +113,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
     const done = { onSuccess: () => { toast('Saved', 'good'); onDone(); }, onError: (e: Error) => toast(e.message, 'bad') };
     if (kind === 'habit') {
       if (!days) return toast('Pick at least one day', 'bad');
-      const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate };
+      const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate, ...(editingHabit ? {} : { startsTomorrow }) };
       action.mutate(editingHabit ? { method: 'PUT', path: `/habits/${editingHabit.id}`, body } : { path: '/habits', body }, done);
     } else {
       const deadlineAt = editingQuest && deadline === toLocalInput(new Date(editingQuest.deadlineAt)) ? editingQuest.deadlineAt : new Date(deadline).toISOString();
@@ -124,7 +129,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   const archive = () => {
     if (!editingHabit) return;
     // Deleting a habit that's still due today fails it first (server rule), so say so.
-    const failsToday = editingHabit.scheduledToday && !editingHabit.log;
+    const failsToday = !fresh && editingHabit.scheduledToday && !editingHabit.log;
     const warning = failsToday ? ` It's still due today, so today counts as a fail (−${editingHabit.xpLoss} XP).` : '';
     if (!confirm(`Delete "${editingHabit.title}"?${warning} Its history stays in your records.`)) return;
     action.mutate({ method: 'DELETE', path: `/habits/${editingHabit.id}` }, { onSuccess: () => { toast('Habit removed'); onDone(); } });
@@ -162,8 +167,10 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
       {/* Stakes are set once: an existing quest hides them, an existing habit shows them locked. */}
       {!editingQuest && (
         <Field label={`Difficulty — XP gained / lost${kind === 'quest' && boss === 'boss' ? ` (×${BOSS_MULTIPLIER} boss)` : ''}`}>
-          <DifficultyPicker value={difficulty} onChange={setDifficulty} multiplier={kind === 'quest' && boss === 'boss' ? BOSS_MULTIPLIER : 1} locked={!!editingHabit} />
-          {editingHabit && <p className="mt-1.5 text-xs text-muted">Locked once a habit is created, so the stakes can't be lowered before a fail.</p>}
+          <DifficultyPicker value={difficulty} onChange={setDifficulty} multiplier={kind === 'quest' && boss === 'boss' ? BOSS_MULTIPLIER : 1} locked={!!editingHabit && !fresh} />
+          {editingHabit && (fresh
+            ? <p className="mt-1.5 text-xs text-muted">Still changeable until {formatDateTime(editingHabit.freeEditUntil)} (its first hour). Then it locks.</p>
+            : <p className="mt-1.5 text-xs text-muted">Locked once a habit is created, so the stakes can't be lowered before a fail.</p>)}
         </Field>
       )}
 
@@ -181,7 +188,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
                 );
               })}
             </div>
-            {editingHabit && <p className="mt-1.5 text-xs text-muted">Changes apply from tomorrow. If it's due today, it stays due today.</p>}
+            {editingHabit && !fresh && <p className="mt-1.5 text-xs text-muted">Changes apply from tomorrow. If it's due today, it stays due today.</p>}
           </Field>
           <Field label="Deadline time (optional)">
             <div className="flex gap-2">
@@ -190,13 +197,31 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
             </div>
             <p className="mt-1.5 text-xs text-muted">Shown as "by HH:MM". You report honestly; anything unresolved fails at midnight.</p>
           </Field>
+          {!editingHabit && (
+            <Field label="Starts">
+              <div className="grid grid-cols-2 gap-1.5">
+                {([[false, 'Today'], [true, 'Tomorrow']] as const).map(([v, label]) => (
+                  <button key={label} type="button" onClick={() => setStartsTomorrow(v)} aria-pressed={startsTomorrow === v}
+                    className={`rounded-xl border py-2 text-sm font-bold transition ${startsTomorrow === v ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {!startsTomorrow && deadlineTime && deadlineTime <= nowHHMM ? (
+                <p className="mt-1.5 text-xs font-semibold text-bad">It's already past {deadlineTime} today, so today would count as late. Start tomorrow?</p>
+              ) : (
+                <p className="mt-1.5 text-xs text-muted">{startsTomorrow ? 'Nothing due today: its first day is tomorrow.' : 'Due today if today is one of its days.'}</p>
+              )}
+            </Field>
+          )}
         </>
       ) : (
         <>
           <Field label="Deadline">
             <input type="datetime-local" className="field" value={deadline} onChange={(e) => setDeadline(e.target.value)}
               max={editingQuest ? toLocalInput(new Date(editingQuest.deadlineAt)) : undefined} />
-            {editingQuest && <p className="mt-1.5 text-xs text-muted">Can only move earlier, never later.</p>}
+            {deadline && <p className="mt-1.5 text-xs text-ink2">Due {formatDateTime(new Date(deadline))}</p>}
+            {editingQuest && <p className="mt-1 text-xs text-muted">Can only move earlier, never later.</p>}
           </Field>
           {!editingQuest && (
             <>
