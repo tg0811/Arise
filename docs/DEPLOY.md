@@ -159,6 +159,7 @@ It first runs every check (typecheck, backend tests, browser smoke test, about 3
 | What | Command |
 |---|---|
 | App logs | `docker compose logs app --tail 100 -f` |
+| Container status | `docker ps --filter name=arise` (the container is named `arise`) |
 | Restart | `docker compose restart app` |
 | Stop | `docker compose down` (data stays in `data/`) |
 | nginx errors | `sudo tail -50 /var/log/nginx/error.log` |

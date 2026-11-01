@@ -1,8 +1,10 @@
 # Run from this folder: docker compose up -d --build
 # The host's nginx (deploy/nginx-arise.conf) terminates HTTPS and proxies to the app on localhost only.
+name: arise # project name (otherwise it's the folder name, "deploy"): image arise-app
 services:
   app:
     build: ..
+    container_name: arise
     restart: unless-stopped
     environment:
       TZ: UTC
