@@ -96,11 +96,11 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
             </div>
             {h.masked ? (
               // Looks like any other habit; tapping the name asks for the password.
-              <p className={`mt-1.5 flex items-center gap-2 font-bold leading-snug ${h.log?.status === 'done' ? 'line-through decoration-good/60' : ''}`}>
+              <p className="mt-1.5 flex items-center gap-2 font-bold leading-snug">
                 <Lock size={14} className="shrink-0 text-muted" /> <TitleButton onClick={unlock}><span className="tracking-widest text-ink2">{h.title}</span></TitleButton>
               </p>
             ) : (
-              <h3 className={`mt-1.5 flex items-center gap-2 font-bold leading-snug ${h.log?.status === 'done' ? 'line-through decoration-good/60' : ''}`}>
+              <h3 className="mt-1.5 flex items-center gap-2 font-bold leading-snug">
                 {h.private && <LockOpen size={14} className="shrink-0 text-accent" aria-label="Private habit" />}<TitleButton onClick={onOpen}>{h.title}</TitleButton>
               </h3>
             )}
@@ -176,7 +176,7 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
               <DifficultyChip d={q.difficulty} />
               {q.chain && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-ink2"><Link2 size={11} /> Part {q.chain.index}/{q.chain.total}</span>}
             </div>
-            <h3 className={`mt-1.5 flex items-center gap-2 font-bold leading-snug ${q.status === 'done' ? 'line-through decoration-good/60' : ''}`}>
+            <h3 className="mt-1.5 flex items-center gap-2 font-bold leading-snug">
               {q.masked ? <Lock size={14} className="shrink-0 text-muted" /> : q.private && <LockOpen size={14} className="shrink-0 text-accent" aria-label="Private quest" />}
               <TitleButton onClick={q.masked ? unlock : onOpen}><span className={q.masked ? 'tracking-widest text-ink2' : ''}>{q.title}</span></TitleButton>
             </h3>
