@@ -78,7 +78,7 @@ test('migration and old backups: single category_id becomes the list', async () 
   assert.equal(attr(s, 'Mind').xp, 10, 'attribute XP survives the restore');
 
   const db = openDb(':memory:');
-  assert.equal((db.prepare('PRAGMA user_version').get() as any).user_version, 10);
+  assert.ok((db.prepare('PRAGMA user_version').get() as any).user_version >= 10, 'multi-category migration applied');
 });
 
 test('stakes are locked: a habit\'s difficulty and a quest\'s type/difficulty can\'t change after creation', async () => {

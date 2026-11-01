@@ -111,7 +111,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
       const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate };
       action.mutate(editingHabit ? { method: 'PUT', path: `/habits/${editingHabit.id}`, body } : { path: '/habits', body }, done);
     } else {
-      const deadlineAt = new Date(deadline).toISOString();
+      const deadlineAt = editingQuest && deadline === toLocalInput(new Date(editingQuest.deadlineAt)) ? editingQuest.deadlineAt : new Date(deadline).toISOString();
       if (editingQuest) {
         action.mutate({ method: 'PUT', path: `/quests/${editingQuest.id}`, body: { title, description, categoryIds, deadlineAt, private: isPrivate } }, done);
       } else {
@@ -122,7 +122,11 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   };
 
   const archive = () => {
-    if (!editingHabit || !confirm(`Delete "${editingHabit.title}"? Its history stays in your records.`)) return;
+    if (!editingHabit) return;
+    // Deleting a habit that's still due today fails it first (server rule), so say so.
+    const failsToday = editingHabit.scheduledToday && !editingHabit.log;
+    const warning = failsToday ? ` It's still due today, so today counts as a fail (−${editingHabit.xpLoss} XP).` : '';
+    if (!confirm(`Delete "${editingHabit.title}"?${warning} Its history stays in your records.`)) return;
     action.mutate({ method: 'DELETE', path: `/habits/${editingHabit.id}` }, { onSuccess: () => { toast('Habit removed'); onDone(); } });
   };
 
@@ -177,6 +181,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
                 );
               })}
             </div>
+            {editingHabit && <p className="mt-1.5 text-xs text-muted">Changes apply from tomorrow. If it's due today, it stays due today.</p>}
           </Field>
           <Field label="Deadline time (optional)">
             <div className="flex gap-2">
@@ -189,7 +194,9 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
       ) : (
         <>
           <Field label="Deadline">
-            <input type="datetime-local" className="field" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            <input type="datetime-local" className="field" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+              max={editingQuest ? toLocalInput(new Date(editingQuest.deadlineAt)) : undefined} />
+            {editingQuest && <p className="mt-1.5 text-xs text-muted">Can only move earlier, never later.</p>}
           </Field>
           {!editingQuest && (
             <>

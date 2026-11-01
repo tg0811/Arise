@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import {
-  ATTR_SCALE, BOSS_MULTIPLIER, CURVE_BASE, CURVE_FACTOR, CURVE_POWER, DAY_CLEAR_RATIO, DIFFICULTIES, DIFFICULTY_XP,
+  ATTR_SCALE, BOSS_MULTIPLIER, FREE_REMOVE_MINUTES, CURVE_BASE, CURVE_FACTOR, CURVE_POWER, DAY_CLEAR_RATIO, DIFFICULTIES, DIFFICULTY_XP,
   MAX_LEVEL, MOOD_TIERS, RANKS, STREAK_TIERS, WEEKLY_BOSS_SHARE, attributeLevel, creditsFor, rankForLevel,
   totalXpForLevel, weeklyBossXp, xpToNext,
   GOAL_LATE_SHARE, GOAL_SIZES, JOURNAL_AAR_XP, LOOT_GEM_STREAK_STEP, LOOT_ODDS, LOOT_STREAK_BONUS_CAP, LOOT_STREAK_BONUS_PER_DAY, lootStreakBonus,
@@ -82,7 +82,8 @@ export function Rules({ s }: { s: AppState }) {
       </Panel>
       <ul className="mt-3 space-y-2 px-1">
         <Rule>What you can gain, you can lose. A task's fail costs exactly its base XP.</Rule>
-        <Rule><b className="text-ink">Stakes are set once.</b> A habit's difficulty, and a quest's difficulty and type, can't be changed after you create them, so nothing can be lowered right before a fail.</Rule>
+        <Rule><b className="text-ink">Stakes are set once.</b> A habit's difficulty, a quest's difficulty and type, and a goal's XP can't be changed after you create them, so nothing can be lowered right before a fail.</Rule>
+        <Rule><b className="text-ink">No escape hatches.</b> Deadlines of quests and goals can only move earlier. Changing a habit's weekdays applies from tomorrow, and deleting a habit that's still due today counts as today's fail.</Rule>
         <Rule>Credits are earned on completion only (XP ÷ 5) and are never taken away. Spend them in the Store.</Rule>
       </ul>
 
@@ -92,7 +93,7 @@ export function Rules({ s }: { s: AppState }) {
           <Rule>Any habit left unresolved <b className="text-ink">fails automatically at midnight</b> ({s.profile.timezone}). The System settles missed days even while the app is closed.</Rule>
           <Rule>A habit's "by HH:MM" time is a promise, not a lock. It turns red when you're late, but you can still report honestly until midnight.</Rule>
           <Rule>A quest that reaches its deadline <b className="text-ink">fails automatically</b>, and the penalty lands on the day it was due.</Rule>
-          <Rule><b className="text-ink">Abandoning</b> a quest costs its full XP. <b className="text-ink">Removing</b> a quest you haven't attempted costs nothing.</Rule>
+          <Rule><b className="text-ink">Abandoning</b> a quest costs its full XP. <b className="text-ink">Removing</b> one is free only in the first {FREE_REMOVE_MINUTES} minutes after you create it (for typos); after that it can only be abandoned.</Rule>
           <Rule><b className="text-ink">Undo</b> works for today's results only (and for quests, only before their deadline). Past days are final.</Rule>
           <Rule>Unscheduled days (rest days) neither count nor fail.</Rule>
         </ul>
@@ -134,7 +135,8 @@ export function Rules({ s }: { s: AppState }) {
           <Rule>Long-horizon targets: <b className="text-ink">Siege</b> (exam), <b className="text-ink">Forge</b> (project), <b className="text-ink">Gauntlet</b> (event). You choose the stakes.</Rule>
           <Rule>Finish before the deadline for the full XP (plus credits). If the deadline passes, you <b className="text-bad">lose the same XP once</b>, and the goal stays on your board.</Rule>
           <Rule>A goal finished after its deadline still earns {pct(GOAL_LATE_SHARE)} of the reward. Late is better than never.</Rule>
-          <Rule>After the deadline passes, the stakes and deadline are locked. Removing a goal never refunds a penalty already paid.</Rule>
+          <Rule>A goal's stakes never change once set, and its deadline can only move earlier (and is locked once it passes).</Rule>
+          <Rule>Removing a goal is free in its first {FREE_REMOVE_MINUTES} minutes. After that, removing it costs its stake, like abandoning, unless the deadline penalty was already paid. A paid penalty is never refunded.</Rule>
         </ul>
         <Table head={['Size', 'On time', 'Missed', 'Late finish']}
           rows={GOAL_SIZES.map((g) => [g.label, <span className="text-good">+{g.xp}</span>, <span className="text-bad">−{g.xp}</span>, `+${Math.round(g.xp * GOAL_LATE_SHARE)}`])} />

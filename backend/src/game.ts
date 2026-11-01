@@ -5,7 +5,7 @@ import { settleWorkoutDay, todayWorkout, workoutDayStats } from './workout.ts';
 import {
   BOSS_MULTIPLIER, DAY_CLEAR_RATIO, DIFFICULTY_XP, MAX_LEVEL,
   addDays, attributeLevel, creditsFor, isScheduled, levelFromXp, localDate, moodFor,
-  nextRank, rankForLevel, streakMultiplier, weekStart, weeklyBossXp,
+  FREE_REMOVE_MINUTES, nextRank, rankForLevel, streakMultiplier, weekStart, weeklyBossXp,
   type Difficulty,
 } from '../../shared/engine.ts';
 
@@ -71,6 +71,8 @@ export interface Task {
   category_id: number | null;
   /** JSON array of category ids; category_id is its first entry. */
   category_ids: string;
+  /** A date this habit is due even if `days` no longer includes it (its days changed that day). */
+  kept_date: string | null;
   difficulty: Difficulty;
   days: string;
   deadline_time: string | null;
@@ -153,13 +155,16 @@ export function totalXp(db: DB): number {
 
 // ---------------------------------------------------------------- habits
 
+/** Is the habit due on `date`? Its weekdays, plus the day its weekdays were changed (changes apply from tomorrow). */
+export const habitDue = (h: Pick<Task, 'days' | 'kept_date'>, date: string) => isScheduled(h.days, date) || h.kept_date === date;
+
 /** Consecutive completed scheduled days strictly before `date`. */
 export function habitStreakBefore(db: DB, habit: Task, date: string): number {
   const logs = db.prepare('SELECT date, status FROM habit_logs WHERE task_id = ? AND date < ?').all(habit.id, date) as { date: string; status: string }[];
   const byDate = new Map(logs.map((l) => [l.date, l.status]));
   let streak = 0;
   for (let d = addDays(date, -1); d >= habit.created_date; d = addDays(d, -1)) {
-    if (!isScheduled(habit.days, d)) continue;
+    if (!habitDue(habit, d)) continue;
     if (byDate.get(d) !== 'done') break;
     streak++;
   }
@@ -183,7 +188,7 @@ function requireActiveHabit(ctx: Ctx, id: number): { habit: Task; date: string }
   const habit = getTask(ctx.db, id);
   if (habit.kind !== 'habit' || habit.archived) throw new HttpError(404, 'Habit not found');
   const date = today(ctx);
-  if (!isScheduled(habit.days, date)) throw new HttpError(400, 'This habit is not scheduled today');
+  if (!habitDue(habit, date)) throw new HttpError(400, 'This habit is not scheduled today');
   if (getHabitLog(ctx.db, id, date)) throw new HttpError(409, 'Already resolved today');
   return { habit, date };
 }
@@ -201,6 +206,20 @@ export function failHabit(ctx: Ctx, id: number) {
   tx(ctx.db, () => {
     const { habit, date } = requireActiveHabit(ctx, id);
     insertHabitLog(ctx, habit, date, 'failed', -DIFFICULTY_XP[habit.difficulty], false);
+  });
+}
+
+/**
+ * Delete (archive) a habit. If it's still due today and unresolved, today counts as failed first:
+ * deleting isn't a way out of today's penalty.
+ */
+export function archiveHabit(ctx: Ctx, habit: Task) {
+  tx(ctx.db, () => {
+    const date = today(ctx);
+    if (habitDue(habit, date) && habit.created_date <= date && !getHabitLog(ctx.db, habit.id, date)) {
+      insertHabitLog(ctx, habit, date, 'failed', -DIFFICULTY_XP[habit.difficulty], false);
+    }
+    ctx.db.prepare('UPDATE tasks SET archived = 1 WHERE id = ?').run(habit.id);
   });
 }
 
@@ -337,10 +356,16 @@ export function undoQuest(ctx: Ctx, id: number) {
 }
 
 /** Remove an unresolved quest (and its locked follow-ups) without penalty. */
+/** Until when a quest or goal can be removed for free (created + FREE_REMOVE_MINUTES). */
+export const freeRemoveUntil = (createdAt: string) => new Date(Date.parse(createdAt) + FREE_REMOVE_MINUTES * 60_000).toISOString();
+
 export function deleteQuest(ctx: Ctx, id: number) {
   tx(ctx.db, () => {
     const q = requireQuest(ctx.db, id);
     if (q.status !== 'pending' && q.status !== 'locked') throw new HttpError(409, 'Resolved quests stay in history');
+    if (ctx.at.toISOString() > freeRemoveUntil(q.created_at)) {
+      throw new HttpError(409, `Free removal is only for the first ${FREE_REMOVE_MINUTES} minutes. Abandon it instead (−${questXp(q)} XP).`);
+    }
     ctx.db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
     if (q.chain_id) {
       ctx.db.prepare("DELETE FROM tasks WHERE chain_id = ? AND chain_index > ? AND status = 'locked'").run(q.chain_id, q.chain_index);
@@ -385,7 +410,7 @@ export function settle(ctx: Ctx) {
     for (let d = addDays(last, 1); d <= yesterday; d = addDays(d, 1)) {
       settleWorkoutDay(ctx, d);
       for (const h of habits) {
-        if (h.created_date > d || !isScheduled(h.days, d)) continue;
+        if (h.created_date > d || !habitDue(h, d)) continue;
         if (getHabitLog(ctx.db, h.id, d)) continue;
         insertHabitLog(ctx, h, d, 'failed', -DIFFICULTY_XP[h.difficulty], true);
       }
@@ -414,7 +439,7 @@ function dayStats(ctx: Ctx, tz: string, todayStr: string, habits: Task[]): Map<s
     if (l.date === todayStr) loggedToday.add(l.task_id);
   }
   for (const h of habits) {
-    if (!h.archived && isScheduled(h.days, todayStr) && h.created_date <= todayStr && !loggedToday.has(h.id)) bump(todayStr, false);
+    if (!h.archived && habitDue(h, todayStr) && h.created_date <= todayStr && !loggedToday.has(h.id)) bump(todayStr, false);
   }
   // Scheduled workout days count like a task: done or missed, and today's if still open.
   for (const w of workoutDayStats(ctx.db)) bump(w.date, w.done);
@@ -498,7 +523,7 @@ export function buildState(ctx: Ctx) {
     const nextMultiplier = streakMultiplier(before + 1);
     return {
       ...maskTask(ctx, h),
-      days: h.days, deadlineTime: h.deadline_time, scheduledToday: isScheduled(h.days, todayStr),
+      days: h.days, deadlineTime: h.deadline_time, scheduledToday: habitDue(h, todayStr),
       log: log ? { status: log.status, xp: log.xp } : null,
       streak, multiplier: nextMultiplier,
       xpGain: Math.round(DIFFICULTY_XP[h.difficulty] * nextMultiplier), xpLoss: DIFFICULTY_XP[h.difficulty],
@@ -515,6 +540,7 @@ export function buildState(ctx: Ctx) {
       chain: q.chain_id ? { index: q.chain_index!, total: q.chain_total! } : null,
       xp: questXp(q), credits: creditsFor(questXp(q)),
       canUndo: q.status !== 'pending' && !!q.deadline_at && new Date(q.deadline_at) > ctx.at,
+      freeRemoveUntil: freeRemoveUntil(q.created_at),
     }));
 
   const { stats, streak, todayStat } = dayProgress(ctx, allHabits);

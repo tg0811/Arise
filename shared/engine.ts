@@ -298,5 +298,8 @@ export const isScheduled = (days: string, date: string) => days.includes(String(
 
 export const ALL_DAYS = '0123456';
 
+/** A quest or goal can be removed without penalty only this long after creating it (typos, second thoughts). */
+export const FREE_REMOVE_MINUTES = 60;
+
 /** Username shown in the header: 3–20 letters, digits, `_` or `.`. The full name stays free text. */
 export const USERNAME_RE = /^[A-Za-z0-9_.]{3,20}$/;

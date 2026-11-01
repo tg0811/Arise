@@ -1,9 +1,9 @@
 import webpush from 'web-push';
 import { getSetting, setSetting, type DB } from './db.ts';
-import { HttpError, getProfile, type Ctx, type Task } from './game.ts';
+import { HttpError, getProfile, habitDue, type Ctx, type Task } from './game.ts';
 import { todayWorkout } from './workout.ts';
 import {
-  DEFAULT_REMINDERS, inQuietHours, isScheduled, localDate, localMinute, minuteOfDay, type ReminderPrefs,
+  DEFAULT_REMINDERS, inQuietHours, localDate, localMinute, minuteOfDay, type ReminderPrefs,
 } from '../../shared/engine.ts';
 
 // Web Push reminders. The server decides what to send every minute (server.ts), so reminders
@@ -127,7 +127,7 @@ export function dueReminders(ctx: Ctx): PushMessage[] {
   const out: PushMessage[] = [];
 
   const habits = (db.prepare("SELECT * FROM tasks WHERE kind = 'habit' AND archived = 0").all() as unknown as Task[])
-    .filter((h) => isScheduled(h.days, today) && h.created_date <= today);
+    .filter((h) => habitDue(h, today) && h.created_date <= today);
   const logged = new Set((db.prepare('SELECT task_id FROM habit_logs WHERE date = ?').all(today) as { task_id: number }[]).map((r) => r.task_id));
   const openHabits = habits.filter((h) => !logged.has(h.id));
   const quests = db.prepare("SELECT * FROM tasks WHERE kind = 'quest' AND status = 'pending'").all() as unknown as Task[];

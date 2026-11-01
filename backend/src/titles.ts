@@ -1,5 +1,5 @@
-import { HttpError, attributeXp, dayProgress, totalXp, type Ctx, type Task } from './game.ts';
-import { GATE_TITLE_WEEKS, attributeLevel, isScheduled, levelFromXp, MAX_LEVEL } from '../../shared/engine.ts';
+import { HttpError, attributeXp, dayProgress, habitDue, totalXp, type Ctx, type Task } from './game.ts';
+import { GATE_TITLE_WEEKS, attributeLevel, levelFromXp, MAX_LEVEL } from '../../shared/engine.ts';
 import { weekStreak } from './workout.ts';
 
 // Titles (M7): earned by deterministic milestones, never by luck. Each is checked against
@@ -72,11 +72,11 @@ function allTitles(m: Milestones): TitleDef[] {
 // ---------------------------------------------------------------- streak walks
 
 /** Best run of consecutive completed scheduled days for one habit (rest days skipped). */
-export function habitBestStreak(habit: Pick<Task, 'days'>, logs: { date: string; status: string }[]): number {
+export function habitBestStreak(habit: Pick<Task, 'days' | 'kept_date'>, logs: { date: string; status: string }[]): number {
   let best = 0;
   let run = 0;
   for (const l of [...logs].sort((a, b) => a.date.localeCompare(b.date))) {
-    if (!isScheduled(habit.days, l.date)) continue;
+    if (!habitDue(habit, l.date)) continue;
     run = l.status === 'done' ? run + 1 : 0;
     best = Math.max(best, run);
   }
@@ -87,7 +87,7 @@ export function milestones(ctx: Ctx): Milestones {
   const { db } = ctx;
   const n = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
 
-  const habits = db.prepare("SELECT id, days FROM tasks WHERE kind = 'habit'").all() as { id: number; days: string }[];
+  const habits = db.prepare("SELECT id, days, kept_date FROM tasks WHERE kind = 'habit'").all() as { id: number; days: string; kept_date: string | null }[];
   const logs = db.prepare('SELECT task_id, date, status FROM habit_logs').all() as { task_id: number; date: string; status: string }[];
   const byHabit = new Map<number, { date: string; status: string }[]>();
   for (const l of logs) byHabit.set(l.task_id, [...(byHabit.get(l.task_id) ?? []), l]);

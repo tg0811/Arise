@@ -115,12 +115,17 @@ test('private quest is masked until unlocked with the password', async () => {
   await expect(page.getByText('Secret errand')).toHaveCount(0);
 });
 
-test('goals: set a major goal', async () => {
+test('goals: set a major goal; its stakes are locked when editing', async () => {
   await page.goto('/goals');
   await page.getByRole('button', { name: 'New goal' }).first().click();
   await page.getByPlaceholder('Clear the semester finals').fill('Run a half marathon');
   await button('Set goal').click();
   await expect(page.getByText('Run a half marathon')).toBeVisible();
+  // Editing: the stakes are locked and the deadline can only move earlier.
+  await page.getByRole('button', { name: 'Edit goal' }).click();
+  await expect(sheet().getByText('Stakes are locked once a goal is set.')).toBeVisible();
+  await expect(sheet().getByRole('button', { name: 'Small ±250' })).toBeDisabled(); // default is Medium
+  await page.getByRole('button', { name: 'Close' }).click();
 });
 
 test('store: add a reward, buy it with quest credits, use it from the inventory', async () => {

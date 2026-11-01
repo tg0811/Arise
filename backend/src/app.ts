@@ -9,9 +9,9 @@ import {
 } from './auth.ts';
 import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
-  getProfile, getTask, logWeight, settle, undoHabit, undoQuest, type Ctx,
+  archiveHabit, getProfile, getTask, habitDue, logWeight, settle, today, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, localDate } from '../../shared/engine.ts';
+import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, isScheduled, localDate } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
 import { completeGoal, createGoal, deleteGoal, undoGoal, updateGoal } from './goals.ts';
 import { buyItem, createItem, deleteItem, openLootbox, updateItem, useItem } from './economy.ts';
@@ -311,8 +311,11 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     // Stakes are fixed at creation (like a quest's): no dropping to Easy right before a fail.
     if (b.difficulty !== h.difficulty) throw new HttpError(409, 'Difficulty is locked once a habit is created');
     const cats = categoriesOf(b);
-    db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, category_ids = ?, difficulty = ?, days = ?, deadline_time = ?, private = ? WHERE id = ?')
-      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, h.id);
+    // New weekdays apply from tomorrow: unticking today can't erase a habit that's due and unresolved.
+    const date = today(ctx(c));
+    const keep = habitDue(h, date) && !isScheduled(b.days, date) && !db.prepare('SELECT 1 FROM habit_logs WHERE task_id = ? AND date = ?').get(h.id, date);
+    db.prepare('UPDATE tasks SET title = ?, description = ?, category_id = ?, category_ids = ?, difficulty = ?, days = ?, deadline_time = ?, private = ?, kept_date = ? WHERE id = ?')
+      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, keep ? date : h.kept_date, h.id);
     return c.json(state(c));
   });
 
@@ -320,9 +323,11 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const h = getTask(db, id(c.req.param('id')));
     if (h.kind !== 'habit') throw new HttpError(404, 'Habit not found');
     if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
-    // Archive so past logs (and the XP they moved) stay in history.
-    db.prepare('UPDATE tasks SET archived = 1 WHERE id = ?').run(h.id);
-    return c.json(state(c));
+    // Archive so past logs (and the XP they moved) stay in history. Still due today → today fails.
+    const cx = ctx(c);
+    settle(cx);
+    archiveHabit(cx, h);
+    return c.json(fullState(cx));
   });
 
   app.post('/api/habits/reorder', async (c) => {
@@ -355,6 +360,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     if (q.kind !== 'quest' || q.status !== 'pending') throw new HttpError(409, 'Only active quests can be edited');
     if (q.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
     if (new Date(b.deadlineAt) <= clock()) throw new HttpError(400, 'Deadline must be in the future');
+    if (new Date(b.deadlineAt) > new Date(q.deadline_at!)) throw new HttpError(409, "A quest's deadline can only move earlier");
     const cats = categoriesOf(b);
     tx(db, () => {
       db.prepare('UPDATE tasks SET title = ?, description = ?, deadline_at = ? WHERE id = ?').run(b.title, b.description, b.deadlineAt, q.id);

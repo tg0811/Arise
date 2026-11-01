@@ -283,6 +283,8 @@ const MIGRATIONS: string[] = [
   ALTER TABLE goals ADD COLUMN category_ids TEXT NOT NULL DEFAULT '[]';
   ALTER TABLE xp_events ADD COLUMN category_ids TEXT NOT NULL DEFAULT '[]';
   `,
+  // 11: a habit whose repeat days changed today stays due today (new days apply from tomorrow).
+  `ALTER TABLE tasks ADD COLUMN kept_date TEXT;`,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

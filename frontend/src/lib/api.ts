@@ -16,6 +16,8 @@ export interface Quest {
   status: 'pending' | 'done' | 'failed'; deadlineAt: string; completedAt: string | null;
   boss: 'none' | 'boss' | 'weekly'; chain: { index: number; total: number } | null;
   xp: number; credits: number; canUndo: boolean;
+  /** Removing it is free until this moment (its first hour); after that it can only be abandoned. */
+  freeRemoveUntil: string;
   /** Private quest; `masked` while this device hasn't unlocked. A chain shares one setting. */
   private: boolean; masked: boolean;
 }
@@ -93,6 +95,8 @@ export interface Goal {
   id: number; title: string; description: string; type: GoalType; categoryIds: number[];
   deadlineAt: string; xp: number; status: 'active' | 'done'; pastDue: boolean; completedAt: string | null;
   reward: number; hasAar: boolean; canUndo: boolean;
+  /** Removing it is free until this moment; later it costs the stake (unless the penalty was already paid). */
+  freeRemoveUntil: string;
 }
 export interface StoreItem { id: number; name: string; description: string; icon: string; cost: number; currency: 'credits' | 'gems'; lootable: boolean }
 export interface Loot { type: LootType; amount: number; itemName?: string }

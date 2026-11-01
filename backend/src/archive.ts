@@ -1,6 +1,6 @@
-import { PRIVATE_MASK, buildState, catIds, dayProgress, getProfile, habitStreakBefore, type Ctx, type Task } from './game.ts';
+import { PRIVATE_MASK, buildState, catIds, dayProgress, habitDue, getProfile, habitStreakBefore, type Ctx, type Task } from './game.ts';
 import { habitBestStreak, milestones } from './titles.ts';
-import { addDays, isScheduled, localDate } from '../../shared/engine.ts';
+import { addDays, localDate } from '../../shared/engine.ts';
 
 // The Archive: a read-only record of everything that happened.
 // Heavier than the live state, so it's fetched on demand (GET /api/archive), not on every mutation.
@@ -104,7 +104,7 @@ export function archiveState(ctx: Ctx, historyBefore?: string) {
       strip: Array.from({ length: HEAT_DAYS }, (_, i) => {
         const d = addDays(today, i - HEAT_DAYS + 1);
         if (d < h.created_date) return 'none';
-        if (!isScheduled(h.days, d)) return 'rest';
+        if (!habitDue(h, d)) return 'rest';
         return (status.get(d) as 'done' | 'failed' | undefined) ?? (d === today ? 'pending' : 'none');
       }),
     };

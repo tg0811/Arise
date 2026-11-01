@@ -1,5 +1,5 @@
 import { tx } from './db.ts';
-import { HttpError, addCurrency, addXp, catIds, getProfile, removeEvents, today, type Ctx } from './game.ts';
+import { HttpError, addCurrency, addXp, catIds, freeRemoveUntil, getProfile, removeEvents, today, type Ctx } from './game.ts';
 import { creditsFor, goalReward, localDate, type GoalType } from '../../shared/engine.ts';
 
 // Major Goals: long-horizon "bosses" (exams, projects, events).
@@ -45,18 +45,27 @@ export function createGoal(ctx: Ctx, g: GoalInput) {
 export function updateGoal(ctx: Ctx, id: number, g: GoalInput) {
   const cur = getGoal(ctx, id);
   if (cur.status !== 'active') throw new HttpError(409, 'Completed goals are final');
-  // Once the penalty is paid the deadline and stakes are locked; only the wording can change.
-  if (cur.past_due && (g.deadlineAt !== cur.deadline_at || g.xp !== cur.xp)) throw new HttpError(409, 'Deadline passed — stakes are locked');
-  if (!cur.past_due && new Date(g.deadlineAt) <= ctx.at) throw new HttpError(400, 'Deadline must be in the future');
+  // Stakes are set once, and a deadline can only move earlier (never pushed back to dodge the penalty).
+  if (g.xp !== cur.xp) throw new HttpError(409, "A goal's stakes are locked once set");
+  const moved = Date.parse(g.deadlineAt) !== Date.parse(cur.deadline_at);
+  if (moved && cur.past_due) throw new HttpError(409, 'Deadline passed: it is locked');
+  if (moved && Date.parse(g.deadlineAt) > Date.parse(cur.deadline_at)) throw new HttpError(409, "A goal's deadline can only move earlier");
+  if (moved && new Date(g.deadlineAt) <= ctx.at) throw new HttpError(400, 'Deadline must be in the future');
   ctx.db.prepare('UPDATE goals SET title = ?, description = ?, type = ?, category_id = ?, category_ids = ?, deadline_at = ?, xp = ? WHERE id = ?')
     .run(g.title, g.description, g.type, g.categoryIds[0] ?? null, JSON.stringify(g.categoryIds), g.deadlineAt, g.xp, id);
 }
 
-/** Remove an active goal. A penalty already paid stays paid. */
+/**
+ * Remove an active goal. Free within FREE_REMOVE_MINUTES of setting it, or once its penalty is already paid;
+ * otherwise removing it costs the stake, like abandoning a quest.
+ */
 export function deleteGoal(ctx: Ctx, id: number) {
   tx(ctx.db, () => {
     const g = getGoal(ctx, id);
     if (g.status !== 'active') throw new HttpError(409, 'Conquered goals stay in history');
+    if (!g.past_due && ctx.at.toISOString() > freeRemoveUntil(g.created_at)) {
+      addXp(ctx, today(ctx), -g.xp, catIds(g), 'goal_penalty', g.id, `Goal abandoned: ${g.title}`);
+    }
     ctx.db.prepare('UPDATE journal SET goal_id = NULL WHERE goal_id = ?').run(id);
     ctx.db.prepare('DELETE FROM goals WHERE id = ?').run(id);
   });
@@ -99,5 +108,6 @@ export function goalsState(ctx: Ctx) {
     reward: goalReward(g.xp, !!g.past_due),
     hasAar: aarGoals.has(g.id),
     canUndo: g.status === 'done' && !!g.completed_at && localDate(tz, new Date(g.completed_at)) === t,
+    freeRemoveUntil: freeRemoveUntil(g.created_at),
   }));
 }

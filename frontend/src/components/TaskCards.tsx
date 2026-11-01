@@ -221,7 +221,10 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
                 <Check size={16} /> Clear
               </button>
               <button onClick={() => setConfirm('fail')} className="rounded-xl border border-bad/30 px-3 py-2 text-sm font-bold text-bad/80" aria-label="Abandon"><X size={16} /></button>
+              {/* Free removal is for the first hour only (typos); after that a quest can only be abandoned. */}
+            {Date.now() < Date.parse(q.freeRemoveUntil) && (
               <button onClick={() => (q.masked ? unlock() : setConfirm('delete'))} className="rounded-xl border border-line px-3 py-2 text-sm text-muted" aria-label="Remove"><Trash2 size={15} /></button>
+            )}
             </>
           )}
         </div>

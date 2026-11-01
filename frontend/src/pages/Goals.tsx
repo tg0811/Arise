@@ -122,7 +122,7 @@ function GoalCard({ s, g, onEdit, onReview }: { s: AppState; g: Goal; onEdit: ()
           confirmDelete ? (
             <>
               <button onClick={() => run('DELETE', `/goals/${g.id}`, 'Goal removed')} className="flex-1 rounded-xl border border-bad/50 bg-bad/15 py-2 text-sm font-bold text-bad">
-                Remove{g.pastDue ? ' (penalty stays)' : ''}
+                {g.pastDue ? 'Remove (penalty already paid)' : Date.now() < Date.parse(g.freeRemoveUntil) ? 'Remove, no penalty' : `Abandon (−${g.xp} XP)`}
               </button>
               <button onClick={() => setConfirmDelete(false)} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink2">Cancel</button>
             </>
@@ -168,10 +168,12 @@ function GoalForm({ s, goal, onDone }: { s: AppState; goal: Goal | null; onDone:
   const [xp, setXp] = useState(goal?.xp ?? GOAL_SIZES[1].xp);
   const [deadline, setDeadline] = useState(toLocalInput(goal ? new Date(goal.deadlineAt) : defaultDeadline()));
   const locked = !!goal?.pastDue;
+  // An existing goal's stakes never change, and its deadline can only move earlier.
+  const original = goal ? toLocalInput(new Date(goal.deadlineAt)) : null;
 
   const save = () => {
     if (!title.trim()) return toast('Name the goal', 'bad');
-    const body = { title, description, type, categoryIds, xp, deadlineAt: locked ? goal!.deadlineAt : new Date(deadline).toISOString() };
+    const body = { title, description, type, categoryIds, xp, deadlineAt: locked || deadline === original ? goal!.deadlineAt : new Date(deadline).toISOString() };
     action.mutate(goal ? { method: 'PUT', path: `/goals/${goal.id}`, body } : { path: '/goals', body }, {
       onSuccess: () => { toast('Saved', 'good'); onDone(); },
       onError: (e) => toast(e.message, 'bad'),
@@ -201,18 +203,20 @@ function GoalForm({ s, goal, onDone }: { s: AppState; goal: Goal | null; onDone:
       <Field label="Stakes: XP won on time, lost if the deadline passes">
         <div className="grid grid-cols-4 gap-1.5">
           {GOAL_SIZES.map((sz) => (
-            <button key={sz.id} type="button" disabled={locked} onClick={() => setXp(sz.xp)}
+            <button key={sz.id} type="button" disabled={!!goal && xp !== sz.xp} onClick={() => setXp(sz.xp)}
               className={`rounded-xl border py-2 text-center transition disabled:opacity-40 ${xp === sz.xp ? 'border-accent bg-accent/20' : 'border-line'}`}>
               <div className="text-xs font-bold">{sz.label}</div>
               <div className="text-[10px] text-ink2">±{sz.xp}</div>
             </button>
           ))}
         </div>
+        {goal && <p className="mt-1.5 text-xs text-muted">Stakes are locked once a goal is set.</p>}
         <p className="mt-1.5 text-xs text-muted">Also pays {creditsFor(xp)} credits. Finishing after the deadline still earns {Math.round(GOAL_LATE_SHARE * 100)}%.</p>
       </Field>
       <Field label="Deadline">
-        <input type="datetime-local" className="field" value={deadline} disabled={locked} onChange={(e) => setDeadline(e.target.value)} />
-        {locked && <p className="mt-1.5 text-xs text-bad">Deadline has passed, so stakes and deadline are locked.</p>}
+        <input type="datetime-local" className="field" value={deadline} disabled={locked} onChange={(e) => setDeadline(e.target.value)} max={original ?? undefined} />
+        {locked ? <p className="mt-1.5 text-xs text-bad">Deadline has passed, so it's locked.</p>
+          : goal && <p className="mt-1.5 text-xs text-muted">Can only move earlier, never later.</p>}
       </Field>
       <Button className="w-full" onClick={save} disabled={action.isPending}>{goal ? 'Save' : 'Set goal'}</Button>
     </div>
