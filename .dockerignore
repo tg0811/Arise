@@ -6,3 +6,5 @@ frontend/dist
 deploy
 *.db
 *.db-*
+test-results
+playwright-report

@@ -2,11 +2,21 @@
   "name": "sololeveling",
   "private": true,
   "type": "module",
-  "workspaces": ["shared", "backend", "frontend"],
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
   "scripts": {
     "dev": "npm run dev -w backend & npm run dev -w frontend",
     "build": "npm run build -w frontend",
     "start": "npm start -w backend",
-    "typecheck": "tsc -p backend --noEmit && tsc -p frontend --noEmit"
+    "typecheck": "tsc -p backend --noEmit && tsc -p frontend --noEmit",
+    "test": "npm test -w @sl/backend",
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run typecheck && npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
   }
 }

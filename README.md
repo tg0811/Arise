@@ -27,9 +27,14 @@ Open http://localhost:5173. The first visit asks you to set a password.
 ## Test
 
 ```bash
-npm test -w @sl/backend         # game rules, driven through the real API with a fake clock
+npm test                        # backend: game rules, driven through the real API with a fake clock
 npm run typecheck
+npm run test:e2e                # browser smoke test: builds, then walks the whole app on a throwaway DB
+npm run check                   # all three; ./deploy.sh runs this and refuses to deploy if it fails
 ```
+
+First time only, the browser test needs its Chromium: `npx playwright install chromium`.
+A failed browser test leaves a trace in `test-results/`; open it with `npx playwright show-trace <path>/trace.zip`.
 
 ## Production (single process)
 

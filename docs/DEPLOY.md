@@ -152,7 +152,7 @@ Commit your changes, then from `SoloLeveling/`:
 ./deploy.sh
 ```
 
-It copies the code (never the database or `.env`), rebuilds, restarts and checks both the app and HTTPS. Downtime is a few seconds. nginx and the certificate don't need touching.
+It first runs every check (typecheck, backend tests, browser smoke test, about 30 s) and **deploys nothing if one fails**. Then it copies the code (never the database or `.env`), rebuilds, restarts and checks both the app and HTTPS. Downtime is a few seconds. nginx and the certificate don't need touching.
 
 ## Useful commands (on the server, in `/opt/tghf/solo-leveling/deploy`)
 

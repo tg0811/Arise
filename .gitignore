@@ -5,3 +5,5 @@ data/
 *.db-*
 .env
 dev-dist/
+test-results/
+playwright-report/

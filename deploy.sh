@@ -4,8 +4,17 @@ set -eu
 HOST=tghf-prod
 DIR=/opt/tghf/solo-leveling
 cd "$(dirname "$0")"
+
+# Nothing ships unless the typecheck, the backend tests and the browser smoke test all pass.
+# SKIP_CHECKS=1 ./deploy.sh skips them: emergencies only (e.g. a hotfix while a test is flaky).
+if [ "${SKIP_CHECKS:-}" = "1" ]; then
+  echo "!! SKIP_CHECKS=1: deploying WITHOUT running the tests"
+else
+  echo "Running checks (typecheck, backend tests, browser smoke test)..."
+  npm run check || { echo; echo "Checks failed: nothing was deployed. Fix the failure above, then run ./deploy.sh again."; exit 1; }
+fi
 rsync -az --delete \
-  --exclude node_modules --exclude dist --exclude dev-dist --exclude .git \
+  --exclude node_modules --exclude dist --exclude dev-dist --exclude .git --exclude test-results --exclude playwright-report \
   --exclude /data --exclude /deploy/data --exclude /deploy/.env \
   ./ "$HOST:$DIR/"
 ssh "$HOST" "cd $DIR/deploy && docker compose up -d --build && docker image prune -f >/dev/null"
