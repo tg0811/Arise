@@ -20,7 +20,10 @@ SOCK=$(mktemp -u "${TMPDIR:-/tmp}/arise-deploy.XXXXXX")
 SSH="ssh -o ControlPath=$SOCK"
 echo "Connecting to $HOST..."
 ssh -o ControlMaster=yes -o ControlPath="$SOCK" -o ControlPersist=yes -fN "$HOST"
-trap 'ssh -o ControlPath="$SOCK" -O exit "$HOST" 2>/dev/null' EXIT
+# Always close it at the end: on success, on a failed step, or on Ctrl+C.
+close() { ssh -o ControlPath="$SOCK" -O exit "$HOST" 2>/dev/null && echo "SSH connection closed."; }
+trap close EXIT
+trap 'exit 130' INT TERM
 
 rsync -az --delete -e "$SSH" \
   --exclude node_modules --exclude dist --exclude dev-dist --exclude .git --exclude test-results --exclude playwright-report \
