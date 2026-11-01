@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Arise Runs</title>
+<style>
+  :root {
+    --bg: #f6f8fc; --panel: #ffffff; --ink: #0f172a; --ink2: #475569; --muted: #64748b;
+    --line: #dbe3ef; --accent: #2563eb; --accent-soft: #dbeafe; --good: #15803d; --bad: #b91c1c;
+    --code-bg: #eef2f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #020617; --panel: #0b1328; --ink: #e2e8f0; --ink2: #a5b4cb; --muted: #7c8aa5;
+      --line: #1e2a44; --accent: #60a5fa; --accent-soft: #11254a; --good: #4ade80; --bad: #f87171;
+      --code-bg: #0f1a33;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 2rem; letter-spacing: .02em; margin: 0 0 .3em; }
+  h2 { font-size: 1.3rem; margin: 2.4em 0 .5em; display: flex; align-items: center; gap: .5em; }
+  h2 .tag { white-space: nowrap; flex-shrink: 0; font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: .2em .6em; border-radius: 99px; }
+  p { margin: .6em 0; }
+  .lede { color: var(--ink2); font-size: 1.08rem; }
+  .muted { color: var(--muted); }
+  code { font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code-bg); padding: .1em .35em; border-radius: 5px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 1em 0; }
+  .analogy { border-left: 4px solid var(--accent); }
+  .analogy b { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  td code { word-break: break-all; }
+  @media (max-width: 480px) { table { font-size: .86rem; } td, th { padding: .45em .35em; } }
+  td, th { text-align: left; padding: .5em .6em; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
+  ul { padding-left: 1.2em; } li { margin: .3em 0; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 1.4em 0 0; }
+  nav.toc a { font-size: .85rem; color: var(--ink2); text-decoration: none; border: 1px solid var(--line); border-radius: 99px; padding: .2em .75em; background: var(--panel); }
+  nav.toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .diagram { width: 100%; height: auto; display: block; margin: .5em 0; }
+  .diagram text { font-family: system-ui, sans-serif; fill: var(--ink); }
+  .diagram .sub { fill: var(--muted); font-size: 11px; }
+  .diagram .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  .diagram .hl { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  .diagram .arrow { stroke: var(--accent); stroke-width: 2; fill: none; marker-end: url(#ah); }
+  .diagram .no { stroke: var(--bad); stroke-width: 2; fill: none; stroke-dasharray: 5 4; marker-end: url(#ahbad); }
+  .diagram .lbl { font-size: 11px; fill: var(--ink2); }
+  .ok { color: var(--good); font-weight: 600; } .x { color: var(--bad); font-weight: 600; }
+  footer { margin-top: 3em; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>How Arise runs on the server</h1>
+  <p class="lede">A beginner's guide to the pieces behind <code>https://89-167-82-104.sslip.io</code>: ports, firewalls, nginx, HTTPS and certbot, Docker, and how one tap on your phone travels through all of them.</p>
+  <nav class="toc">
+    <a href="#building">The building</a><a href="#ports">Ports</a><a href="#firewall">Firewall</a><a href="#nginx">nginx</a>
+    <a href="#caddy">Caddy</a><a href="#https">HTTPS &amp; certbot</a><a href="#docker">Docker</a><a href="#forwarding">Port forwarding</a>
+    <a href="#journey">A request's journey</a><a href="#deploy">Deploying</a><a href="#glossary">Cheat sheet</a>
+  </nav>
+
+  <h2 id="building"><span class="tag">Big picture</span> Your server is an office building</h2>
+  <div class="card analogy">
+    <p>Think of the Hetzner server as a building:</p>
+    <ul>
+      <li>The <b>IP address</b> <code>89.167.82.104</code> is its street address.</li>
+      <li><b>Ports</b> are numbered doors. Every visitor arrives at the address <em>and</em> a door number.</li>
+      <li>The <b>firewall</b> is the security guard who decides which doors are open at all.</li>
+      <li><b>nginx</b> is the receptionist behind doors 80 and 443, sending each visitor to the right office.</li>
+      <li><b>Docker</b> is a sealed office room where one app lives with everything it needs.</li>
+      <li><b>certbot</b> fetches the official ID card that proves the building is who it claims to be (HTTPS).</li>
+    </ul>
+  </div>
+
+  <h2 id="ports"><span class="tag">Doors</span> Ports</h2>
+  <p>One server runs many programs at once, so the port number says <em>which</em> program a request is for. A few numbers are conventions that every browser knows:</p>
+  <table>
+    <tr><th>Port</th><th>Used for</th><th>On your server</th></tr>
+    <tr><td><code>22</code></td><td>SSH: you logging in to the terminal</td><td>open</td></tr>
+    <tr><td><code>80</code></td><td>Plain web, <code>http://</code></td><td>nginx</td></tr>
+    <tr><td><code>443</code></td><td>Secure web, <code>https://</code></td><td>nginx (after certbot)</td></tr>
+    <tr><td><code>8787</code></td><td>Arise itself. Just a number we picked</td><td>only reachable from inside the server</td></tr>
+    <tr><td><code>5173</code></td><td>The Vite dev server on your <em>laptop</em></td><td>not used in production</td></tr>
+  </table>
+  <p>When you type <code>https://example.com</code>, the browser silently goes to door 443. Any other door has to be written in the URL, like <code>https://example.com:8787</code>.</p>
+  <p><b>Only one program can hold a port.</b> nginx already holds 80, so Caddy (which also wanted 80) couldn't run next to it.</p>
+
+  <h2 id="firewall"><span class="tag">Security guard</span> Firewall</h2>
+  <p>A list of which doors are open from the outside. Even if a program listens on 8787, nobody on the internet reaches it if the firewall says no. You have up to <b>two guards</b>, and a visitor must get past both:</p>
+  <ul>
+    <li><b>Hetzner Cloud Firewall</b>: set in Hetzner's web console. It stands in front of the server, before traffic even arrives.</li>
+    <li><b>ufw</b> ("uncomplicated firewall"): runs on the server itself.</li>
+  </ul>
+  <p>For Arise both need TCP <b>80</b> and <b>443</b> open. <b>8787 stays closed</b>, because only nginx needs to reach it, from inside the server.</p>
+
+  <h2 id="nginx"><span class="tag">Receptionist</span> nginx, a "reverse proxy"</h2>
+  <p>nginx is a program sitting on doors 80 and 443. It reads <em>which name</em> the visitor asked for and forwards them to the right place:</p>
+  <svg class="diagram" viewBox="0 0 640 210" role="img" aria-label="nginx routes requests by name: the sslip.io name goes to Arise on port 8787, anything else goes to the default site">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+      <marker id="ahbad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+    </defs>
+    <rect class="box" x="10" y="35" width="150" height="56" rx="10"/><text x="85" y="60" text-anchor="middle" font-weight="600">Visitor A</text><text class="sub" x="85" y="78" text-anchor="middle">89-167-82-104.sslip.io</text>
+    <rect class="box" x="10" y="120" width="150" height="56" rx="10"/><text x="85" y="145" text-anchor="middle" font-weight="600">Visitor B</text><text class="sub" x="85" y="163" text-anchor="middle">89.167.82.104 (bare IP)</text>
+    <rect class="hl" x="245" y="70" width="150" height="70" rx="10"/><text x="320" y="100" text-anchor="middle" font-weight="700">nginx</text><text class="sub" x="320" y="118" text-anchor="middle">doors 80 + 443</text>
+    <rect class="hl" x="480" y="35" width="150" height="56" rx="10"/><text x="555" y="60" text-anchor="middle" font-weight="600">Arise</text><text class="sub" x="555" y="78" text-anchor="middle">127.0.0.1:8787</text>
+    <rect class="box" x="480" y="120" width="150" height="56" rx="10"/><text x="555" y="145" text-anchor="middle" font-weight="600">Default site</text><text class="sub" x="555" y="163" text-anchor="middle">your existing nginx page</text>
+    <path class="arrow" d="M160,63 L243,95"/><path class="arrow" d="M160,148 L243,118"/>
+    <path class="arrow" d="M395,95 L478,63"/><path class="arrow" d="M395,118 L478,148"/>
+  </svg>
+  <p>That's why many websites can share doors 80 and 443: each gets its own <code>server_name</code> block. Arise's block lives in <code>deploy/nginx-arise.conf</code>. <code>127.0.0.1</code> means "this same machine", so the Arise office is never visible from outside; only the receptionist talks to it.</p>
+
+  <h2 id="caddy"><span class="tag">Not used</span> Caddy</h2>
+  <p>Another receptionist, like nginx, that also fetches HTTPS certificates on its own. It was the first plan. Since you already run nginx on door 80, and two programs can't hold the same door, we use nginx + certbot instead. The result is the same.</p>
+
+  <h2 id="https"><span class="tag">ID card</span> HTTPS, certificates and certbot</h2>
+  <p>HTTPS does two jobs:</p>
+  <ol>
+    <li><b>Encrypts</b> the traffic, so your password and data can't be read on the way (on café Wi-Fi, for example).</li>
+    <li><b>Proves identity</b>, so the browser knows it's talking to the real server and not an impostor.</li>
+  </ol>
+  <p>The proof is a <b>certificate</b>, a signed ID card. <b>Let's Encrypt</b> hands them out for free, but first it checks that you control the name, by visiting your server on <b>port 80</b>. That's why port 80 can't be avoided.</p>
+  <p><b>certbot</b> is the tool that does this for you. It asks Let's Encrypt for the certificate, edits nginx's Arise site to add door 443 and the HTTP→HTTPS redirect, and <b>renews it automatically</b> before it expires (about every 90 days).</p>
+  <div class="card">
+    <p><b>Why Arise needs HTTPS:</b> browsers only allow installing a PWA, running its service worker, and sending push notifications on HTTPS sites. The login cookie is also marked "Secure", so it's only sent over HTTPS.</p>
+    <p><b>Why sslip.io:</b> Let's Encrypt won't certify a bare IP address, only a <em>name</em>. sslip.io is a free service where any name like <code>89-167-82-104.sslip.io</code> automatically points to the IP written inside it. No domain purchase needed. When you buy <code>arise.&lt;domain&gt;.com</code>, you just point it at the same IP and run certbot again.</p>
+  </div>
+
+  <h2 id="docker"><span class="tag">Sealed room</span> Docker</h2>
+  <p>Docker packages an app with <em>everything</em> it needs (here: Node 26, the code, its libraries) into one box.</p>
+  <table>
+    <tr><th>Word</th><th>Meaning</th><th>In Arise</th></tr>
+    <tr><td><b>Image</b></td><td>The packed box, like an installer</td><td>built from <code>Dockerfile</code></td></tr>
+    <tr><td><b>Container</b></td><td>A running image: the app actually going</td><td><code>app</code></td></tr>
+    <tr><td><b>Dockerfile</b></td><td>The recipe to build the image</td><td><code>SoloLeveling/Dockerfile</code></td></tr>
+    <tr><td><b>Compose file</b></td><td>How to run it: restart on crash, which folder to keep, which port</td><td><code>deploy/compose.yaml</code></td></tr>
+    <tr><td><b>Volume</b></td><td>A folder that lives <em>outside</em> the box, so it survives rebuilds</td><td><code>deploy/data/</code> (the database)</td></tr>
+  </table>
+  <p>Why bother:</p>
+  <ul>
+    <li>The server doesn't need Node 26 installed, so there's no version mess.</li>
+    <li>Arise can't interfere with the trading bot or anything else.</li>
+    <li>The box that works on your laptop is the same box that runs on the server.</li>
+    <li>Updating means building a new box and swapping it in. The database stays, because it's in the volume.</li>
+  </ul>
+
+  <h2 id="forwarding"><span class="tag">Passing it on</span> Port forwarding</h2>
+  <p>In general: "traffic arriving at door X gets passed on to door Y somewhere else". The classic example is a home router forwarding a port to your PC so friends can join a game server. You <b>don't</b> need router forwarding, because a Hetzner server sits directly on the internet. Two similar things do happen in your setup:</p>
+  <ul>
+    <li><b>Docker port mapping:</b> <code>127.0.0.1:8787:8787</code> in <code>compose.yaml</code> means "connect the server's door 8787 (localhost only) to door 8787 inside the sealed container". This is the hole that lets nginx reach in.</li>
+    <li><b>nginx proxying:</b> door 443 → <code>127.0.0.1:8787</code>. A smarter kind of forwarding that also looks at the name and handles HTTPS.</li>
+  </ul>
+
+  <h2 id="journey"><span class="tag">All together</span> One tap on your phone, start to finish</h2>
+  <svg class="diagram" viewBox="160 0 480 575" role="img" aria-label="The path of a request: phone, sslip.io name lookup, Hetzner firewall, ufw, nginx on 443, Docker port mapping on 127.0.0.1:8787, the Arise container and its database. A direct attempt at port 8787 from outside is blocked by the firewall.">
+    <rect class="box" x="170" y="10" width="300" height="52" rx="10"/><text x="320" y="33" text-anchor="middle" font-weight="700">📱 Phone</text><text class="sub" x="320" y="50" text-anchor="middle">opens https://89-167-82-104.sslip.io</text>
+    <path class="arrow" d="M320,62 L320,84"/><text class="lbl" x="332" y="78">name → 89.167.82.104 (sslip.io)</text>
+    <rect class="box" x="170" y="86" width="300" height="52" rx="10"/><text x="320" y="109" text-anchor="middle" font-weight="600">Hetzner Cloud Firewall</text><text class="sub" x="320" y="126" text-anchor="middle">door 443 open? ✓</text>
+    <path class="arrow" d="M320,138 L320,160"/>
+    <rect class="box" x="170" y="162" width="300" height="52" rx="10"/><text x="320" y="185" text-anchor="middle" font-weight="600">ufw (on the server)</text><text class="sub" x="320" y="202" text-anchor="middle">door 443 open? ✓</text>
+    <path class="arrow" d="M320,214 L320,236"/>
+    <rect class="hl" x="170" y="238" width="300" height="66" rx="10"/><text x="320" y="262" text-anchor="middle" font-weight="700">nginx on door 443</text><text class="sub" x="320" y="279" text-anchor="middle">decrypts HTTPS with certbot's certificate</text><text class="sub" x="320" y="294" text-anchor="middle">name is the sslip.io one → Arise</text>
+    <path class="arrow" d="M320,304 L320,326"/>
+    <rect class="box" x="170" y="328" width="300" height="52" rx="10"/><text x="320" y="351" text-anchor="middle" font-weight="600">127.0.0.1:8787</text><text class="sub" x="320" y="368" text-anchor="middle">Docker port mapping into the container</text>
+    <path class="arrow" d="M320,380 L320,402"/>
+    <rect class="hl" x="170" y="404" width="300" height="52" rx="10"/><text x="320" y="427" text-anchor="middle" font-weight="700">Arise container (Node 26)</text><text class="sub" x="320" y="444" text-anchor="middle">runs the game rules, serves the app</text>
+    <path class="arrow" d="M320,456 L320,478"/>
+    <rect class="box" x="170" y="480" width="300" height="52" rx="10"/><text x="320" y="503" text-anchor="middle" font-weight="600">deploy/data/sololeveling.db</text><text class="sub" x="320" y="520" text-anchor="middle">your progress (volume, outside the box)</text>
+    <text class="lbl" x="320" y="560" text-anchor="middle">The answer travels back up the same path, re-encrypted by nginx.</text>
+    <rect class="box" x="490" y="86" width="140" height="52" rx="10"/><text x="560" y="107" text-anchor="middle" font-size="12" font-weight="600">Stranger tries</text><text class="sub" x="560" y="124" text-anchor="middle">89.167.82.104:8787</text>
+    <path class="no" d="M490,112 L476,112"/><text class="lbl" x="560" y="156" text-anchor="middle" fill="var(--bad)">✗ blocked: door closed</text>
+  </svg>
+
+  <h2 id="deploy"><span class="tag">Updates</span> What <code>./deploy.sh</code> does</h2>
+  <ol>
+    <li><b>Copies your code</b> from the laptop to <code>/opt/tghf/solo-leveling</code> on the server (with <code>rsync</code>). It never copies the database or <code>.env</code>, so live data is safe.</li>
+    <li><b>Tells Docker</b> to rebuild the box from the new code and swap it in (<code>docker compose up -d --build</code>). Downtime is a few seconds.</li>
+    <li><b>Checks</b> the app answers on the server, then that it answers over HTTPS.</li>
+  </ol>
+  <p class="muted">nginx and the certificate don't change on updates. They were set up once, following <code>docs/DEPLOY.md</code>.</p>
+
+  <h2 id="glossary"><span class="tag">Cheat sheet</span> One line each</h2>
+  <table>
+    <tr><td><b>IP address</b></td><td>The server's street address: <code>89.167.82.104</code>.</td></tr>
+    <tr><td><b>Domain / name</b></td><td>A human-friendly name that points to an IP. Yours for now: <code>89-167-82-104.sslip.io</code>.</td></tr>
+    <tr><td><b>Port</b></td><td>A numbered door on that address; 80 = http, 443 = https.</td></tr>
+    <tr><td><b>Firewall</b></td><td>Guard deciding which doors are open (Hetzner's, plus ufw on the server).</td></tr>
+    <tr><td><b>nginx</b></td><td>Receptionist on 80/443 that routes each name to the right app.</td></tr>
+    <tr><td><b>Reverse proxy</b></td><td>The job nginx does: take outside requests and pass them to apps inside.</td></tr>
+    <tr><td><b>Caddy</b></td><td>An alternative receptionist with built-in certificates. Not used here.</td></tr>
+    <tr><td><b>HTTPS</b></td><td>Encrypted web plus proof of identity. Needed for PWA install and push.</td></tr>
+    <tr><td><b>Certificate</b></td><td>The signed ID card that proves the name belongs to your server.</td></tr>
+    <tr><td><b>Let's Encrypt</b></td><td>The free authority that issues those certificates.</td></tr>
+    <tr><td><b>certbot</b></td><td>Tool that fetches the certificate, wires it into nginx, and renews it.</td></tr>
+    <tr><td><b>Docker</b></td><td>Packs the app and its needs into a sealed, repeatable box.</td></tr>
+    <tr><td><b>Port mapping</b></td><td>The hole from a server port into a container's port.</td></tr>
+    <tr><td><b>localhost / 127.0.0.1</b></td><td>"This same machine". Not reachable from the internet.</td></tr>
+    <tr><td><b>SSH</b></td><td>Secure remote terminal into the server (door 22).</td></tr>
+  </table>
+
+  <footer>Arise · docs/how-it-works.html · companion to <code>docs/DEPLOY.md</code></footer>
+</main>
+</body>
+</html>

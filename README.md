@@ -42,7 +42,7 @@ Environment: `PORT` (8787), `DATA_DIR` (`./data`), `INITIAL_PASSWORD` (first sta
 
 ## Deploy (Hetzner, Docker behind the host's nginx)
 
-Step-by-step runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md). Runs on `tghf-prod` in `/opt/tghf/solo-leveling`: the app container on `127.0.0.1:8787`, behind the server's existing nginx (site file `deploy/nginx-arise.conf`, HTTPS via certbot). Live at `https://89-167-82-104.sslip.io`.
+Step-by-step runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md). New to Docker/nginx/HTTPS? Open [`docs/how-it-works.html`](docs/how-it-works.html) in a browser. Runs on `tghf-prod` in `/opt/tghf/solo-leveling`: the app container on `127.0.0.1:8787`, behind the server's existing nginx (site file `deploy/nginx-arise.conf`, HTTPS via certbot). Live at `https://89-167-82-104.sslip.io`.
 
 ```bash
 ./deploy.sh                     # rsync this folder to the server, rebuild, health-check
