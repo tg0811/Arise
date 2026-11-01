@@ -300,6 +300,11 @@ const MIGRATIONS: string[] = [
   -- Pending passkey challenge for this session: JSON { challenge, at }, single use.
   ALTER TABLE sessions ADD COLUMN challenge TEXT;
   `,
+  `
+  -- 13: a habit's difficulty can be raised (never lowered); the raise starts on next_difficulty_from (tomorrow).
+  ALTER TABLE tasks ADD COLUMN next_difficulty TEXT;
+  ALTER TABLE tasks ADD COLUMN next_difficulty_from TEXT;
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

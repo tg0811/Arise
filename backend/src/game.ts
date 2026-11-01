@@ -73,6 +73,9 @@ export interface Task {
   category_ids: string;
   /** A date this habit is due even if `days` no longer includes it (its days changed that day). */
   kept_date: string | null;
+  /** A raised difficulty waiting to start, and the day it starts (raises apply from tomorrow). */
+  next_difficulty: Difficulty | null;
+  next_difficulty_from: string | null;
   difficulty: Difficulty;
   days: string;
   deadline_time: string | null;
@@ -163,6 +166,10 @@ export function totalXp(db: DB): number {
 export const habitDue = (h: Pick<Task, 'days' | 'kept_date' | 'created_date'>, date: string) =>
   date >= h.created_date && (isScheduled(h.days, date) || h.kept_date === date);
 
+/** A habit's difficulty on `date`: a raise counts from its start day, never for a day already under way. */
+export const difficultyOn = (h: Pick<Task, 'difficulty' | 'next_difficulty' | 'next_difficulty_from'>, date: string): Difficulty =>
+  h.next_difficulty && h.next_difficulty_from && date >= h.next_difficulty_from ? h.next_difficulty : h.difficulty;
+
 /** A habit, quest or goal in its first FREE_REMOVE_MINUTES: mistakes can be fixed without penalty. */
 export const isFresh = (createdAt: string, now: Date) => now.toISOString() < freeRemoveUntil(createdAt);
 
@@ -189,7 +196,7 @@ function insertHabitLog(ctx: Ctx, habit: Task, date: string, status: 'done' | 'f
   const logId = Number(res.lastInsertRowid);
   const note = `${status === 'done' ? 'Completed' : auto ? 'Missed' : 'Failed'}: ${habit.title}`;
   addXp(ctx, date, xp, catIds(habit), 'habit', logId, note);
-  if (status === 'done') addCurrency(ctx, date, 'credits', creditsFor(DIFFICULTY_XP[habit.difficulty]), 'habit', logId, note);
+  if (status === 'done') addCurrency(ctx, date, 'credits', creditsFor(DIFFICULTY_XP[difficultyOn(habit, date)]), 'habit', logId, note);
 }
 
 function requireActiveHabit(ctx: Ctx, id: number): { habit: Task; date: string } {
@@ -205,7 +212,7 @@ export function completeHabit(ctx: Ctx, id: number) {
   tx(ctx.db, () => {
     const { habit, date } = requireActiveHabit(ctx, id);
     const streak = habitStreakBefore(ctx.db, habit, date) + 1;
-    const xp = Math.round(DIFFICULTY_XP[habit.difficulty] * streakMultiplier(streak));
+    const xp = Math.round(DIFFICULTY_XP[difficultyOn(habit, date)] * streakMultiplier(streak));
     insertHabitLog(ctx, habit, date, 'done', xp, false);
   });
 }
@@ -213,7 +220,7 @@ export function completeHabit(ctx: Ctx, id: number) {
 export function failHabit(ctx: Ctx, id: number) {
   tx(ctx.db, () => {
     const { habit, date } = requireActiveHabit(ctx, id);
-    insertHabitLog(ctx, habit, date, 'failed', -DIFFICULTY_XP[habit.difficulty], false);
+    insertHabitLog(ctx, habit, date, 'failed', -DIFFICULTY_XP[difficultyOn(habit, date)], false);
   });
 }
 
@@ -225,7 +232,7 @@ export function archiveHabit(ctx: Ctx, habit: Task) {
   tx(ctx.db, () => {
     const date = today(ctx);
     if (!isFresh(habit.created_at, ctx.at) && habitDue(habit, date) && !getHabitLog(ctx.db, habit.id, date)) {
-      insertHabitLog(ctx, habit, date, 'failed', -DIFFICULTY_XP[habit.difficulty], false);
+      insertHabitLog(ctx, habit, date, 'failed', -DIFFICULTY_XP[difficultyOn(habit, date)], false);
     }
     ctx.db.prepare('UPDATE tasks SET archived = 1 WHERE id = ?').run(habit.id);
   });
@@ -408,22 +415,27 @@ export function settle(ctx: Ctx) {
     const todayStr = localDate(profile.timezone, ctx.at);
     const yesterday = addDays(todayStr, -1);
     const last = getSetting(ctx.db, 'last_settled_date');
+    // Raises that have started become the habit's difficulty, once every day before them is settled.
+    const promoteRaises = () => ctx.db.prepare(`UPDATE tasks SET difficulty = next_difficulty, next_difficulty = NULL, next_difficulty_from = NULL
+      WHERE next_difficulty IS NOT NULL AND next_difficulty_from <= ?`).run(todayStr);
     if (!last) {
       // First run: nothing before today was ever tracked.
       setSetting(ctx.db, 'last_settled_date', yesterday);
+      promoteRaises();
       return;
     }
-    if (last >= yesterday) return;
+    if (last >= yesterday) { promoteRaises(); return; }
     const habits = ctx.db.prepare("SELECT * FROM tasks WHERE kind = 'habit' AND archived = 0").all() as unknown as Task[];
     for (let d = addDays(last, 1); d <= yesterday; d = addDays(d, 1)) {
       settleWorkoutDay(ctx, d);
       for (const h of habits) {
         if (h.created_date > d || !habitDue(h, d)) continue;
         if (getHabitLog(ctx.db, h.id, d)) continue;
-        insertHabitLog(ctx, h, d, 'failed', -DIFFICULTY_XP[h.difficulty], true);
+        insertHabitLog(ctx, h, d, 'failed', -DIFFICULTY_XP[difficultyOn(h, d)], true);
       }
     }
     setSetting(ctx.db, 'last_settled_date', yesterday);
+    promoteRaises();
   });
 }
 
@@ -535,7 +547,8 @@ export function buildState(ctx: Ctx) {
       startsOn: h.created_date, freeEditUntil: freeRemoveUntil(h.created_at),
       log: log ? { status: log.status, xp: log.xp } : null,
       streak, multiplier: nextMultiplier,
-      xpGain: Math.round(DIFFICULTY_XP[h.difficulty] * nextMultiplier), xpLoss: DIFFICULTY_XP[h.difficulty],
+      xpGain: Math.round(DIFFICULTY_XP[difficultyOn(h, todayStr)] * nextMultiplier), xpLoss: DIFFICULTY_XP[difficultyOn(h, todayStr)],
+      nextDifficulty: h.next_difficulty && h.next_difficulty_from! > todayStr ? { difficulty: h.next_difficulty, from: h.next_difficulty_from! } : null,
     };
   });
 

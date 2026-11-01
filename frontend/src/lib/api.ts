@@ -8,6 +8,8 @@ export interface Habit {
   days: string; deadlineTime: string | null; scheduledToday: boolean;
   /** First day it counts (YYYY-MM-DD; tomorrow if created with "starts tomorrow"). Until `freeEditUntil` it can be fixed freely. */
   startsOn: string; freeEditUntil: string;
+  /** A raise waiting to start (raises apply from the next day; difficulty never goes down). */
+  nextDifficulty: { difficulty: Difficulty; from: string } | null;
   /** Private habit; `masked` while this device hasn't unlocked (title/description/category hidden). */
   private: boolean; masked: boolean;
   log: { status: 'done' | 'failed'; xp: number } | null;

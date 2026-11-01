@@ -10,7 +10,7 @@ import { CategoryIcon, useToast } from './ui';
 import { sfx } from '../lib/sound';
 import { Countdown } from './Countdown';
 import { Button } from './ui';
-import { daysLabel, formatDateTime, formatDay } from '../lib/time';
+import { daysLabel, formatDate, formatDateTime, formatDay } from '../lib/time';
 
 /** One chip per category, in the order they were picked. */
 function CategoryChips({ s, ids }: { s: AppState; ids: number[] }) {
@@ -92,6 +92,7 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
                 <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-gold"><Flame size={11} />{h.streak}</span>
               )}
               {h.multiplier > 1 && !resolved && <span className="text-[11px] font-black text-accent2">×{h.multiplier}</span>}
+            {h.nextDifficulty && <span className="text-[11px] font-bold text-ink2">↑ {DIFFICULTY_STYLE[h.nextDifficulty.difficulty].label} from {formatDate(h.nextDifficulty.from)}</span>}
             </div>
             {h.masked ? (
               // Looks like any other habit; tapping the name asks for the password.
@@ -268,6 +269,7 @@ export function TaskDetail({ s, task, onEdit }: { s: AppState; task: { kind: 'ha
             <Fact label="Deadline">{task.h.deadlineTime ? `by ${task.h.deadlineTime}` : 'End of day'}</Fact>
             <Fact label="Streak"><span className="inline-flex items-center gap-1"><Flame size={13} className="text-gold" />{task.h.streak} day{task.h.streak === 1 ? '' : 's'}</span>{task.h.multiplier > 1 && <span className="ml-1.5 text-accent2">×{task.h.multiplier}</span>}</Fact>
             <Fact label="XP"><span className="text-good">+{task.h.xpGain}</span> / <span className="text-bad">−{task.h.xpLoss}</span></Fact>
+            {task.h.nextDifficulty && <Fact label="Raised">{DIFFICULTY_STYLE[task.h.nextDifficulty.difficulty].label} from {formatDay(task.h.nextDifficulty.from)}</Fact>}
             <Fact label="Today">{task.h.startsOn > s.today ? 'Not started yet' : !task.h.scheduledToday ? 'Rest day' : task.h.log ? (task.h.log.status === 'done' ? <span className="text-good">Done</span> : <span className="text-bad">Failed</span>) : 'Not done yet'}</Fact>
           </>
         ) : (

@@ -137,3 +137,46 @@ test('in its first hour a habit can be fixed freely: delete with no fail, change
   const a = await h.call('GET', '/api/archive');
   assert.equal(a.history.length, 0, 'no fail recorded');
 });
+
+test('difficulty can be raised (from tomorrow) but never lowered; a raise not started yet can be undone', async () => {
+  const h = harness();
+  let s = await h.boot();
+  s = await h.call('POST', '/api/habits', { title: 'NNN', difficulty: 'hard' });
+  const id = s.habits[0].id;
+  const edit = (difficulty: string) => h.call('PUT', `/api/habits/${id}`, { title: 'NNN', difficulty });
+  h.advance(1.5); // past the free first hour (Monday 11:00 IST)
+
+  await assert.rejects(edit('normal'), { status: 409 }, 'never lower');
+  s = await edit('legendary');
+  assert.equal(s.habits[0].difficulty, 'hard', 'today stays Hard');
+  assert.deepEqual(s.habits[0].nextDifficulty, { difficulty: 'legendary', from: '2026-11-03' });
+  assert.equal(s.habits[0].xpGain, 50, 'today pays the old stake');
+  s = await edit('hard');
+  assert.equal(s.habits[0].nextDifficulty, null, 'undo the raise before it starts');
+  s = await edit('legendary');
+  s = await h.call('POST', `/api/habits/${id}/complete`);
+  assert.equal(s.progress.totalXp, 50, 'completing today: Hard');
+
+  h.advance(24); // Tuesday: the raise is live
+  s = await h.call('GET', '/api/state');
+  assert.deepEqual([s.habits[0].difficulty, s.habits[0].nextDifficulty], ['legendary', null]);
+  await assert.rejects(edit('hard'), { status: 409 }, 'and now it can\'t go back down');
+  h.advance(24); // Wednesday: Tuesday was missed → it fails at the new stake
+  s = await h.call('GET', '/api/state');
+  assert.equal(s.progress.totalXp, 0, '50 − 100, floored at 0');
+  const notes = (await h.call('GET', '/api/archive')).history.flatMap((d: any) => d.events);
+  assert.ok(notes.some((e: any) => e.amount === -100), 'missed day cost the Legendary stake');
+});
+
+test('a raise waiting over a gap of unsettled days: earlier days fail at the old stake', async () => {
+  const h = harness();
+  let s = await h.boot();
+  s = await h.call('POST', '/api/habits', { title: 'H', difficulty: 'easy' });
+  const id = s.habits[0].id;
+  h.advance(1.5);
+  await h.call('PUT', `/api/habits/${id}`, { title: 'H', difficulty: 'hard' }); // from Tuesday
+  h.advance(72); // nobody opens the app until Thursday: Monday (easy) and Tuesday, Wednesday (hard) all missed
+  await h.call('GET', '/api/state');
+  const amounts = (await h.call('GET', '/api/archive')).history.flatMap((d: any) => d.events).map((e: any) => e.amount).sort();
+  assert.deepEqual(amounts, [-10, -50, -50]);
+});

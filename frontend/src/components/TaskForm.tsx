@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { Plus, Trash2, Repeat, Swords, Skull, Crown, Lock } from 'lucide-react';
-import { DIFFICULTIES, DIFFICULTY_XP, BOSS_MULTIPLIER, type Difficulty } from '@shared';
+import { DIFFICULTIES, DIFFICULTY_XP, BOSS_MULTIPLIER, addDays as addDayStr, type Difficulty } from '@shared';
 import { useAction, type AppState, type Habit, type Quest } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
-import { formatDateTime, toLocalInput } from '../lib/time';
+import { formatDateTime, formatDay, toLocalInput } from '../lib/time';
 import { Button, CategoryIcon, useToast } from './ui';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -61,14 +61,15 @@ export function CategoriesPicker({ s, value, onChange }: { s: AppState; value: n
   );
 }
 
-function DifficultyPicker({ value, onChange, multiplier = 1, locked = false }: { value: Difficulty; onChange: (d: Difficulty) => void; multiplier?: number; locked?: boolean }) {
+/** `min`: difficulties below it can't be picked (an existing habit can only be raised). */
+function DifficultyPicker({ value, onChange, multiplier = 1, min }: { value: Difficulty; onChange: (d: Difficulty) => void; multiplier?: number; min?: Difficulty }) {
   return (
     <div className="grid grid-cols-4 gap-1.5">
       {DIFFICULTIES.map((d) => {
         const st = DIFFICULTY_STYLE[d];
         const on = value === d;
         return (
-          <button key={d} type="button" onClick={() => onChange(d)} disabled={locked && !on}
+          <button key={d} type="button" onClick={() => onChange(d)} disabled={!!min && DIFFICULTIES.indexOf(d) < DIFFICULTIES.indexOf(min)}
             className="rounded-xl border py-2 text-center transition disabled:opacity-30"
             style={{ borderColor: `color-mix(in srgb, ${st.color} ${on ? 90 : 25}%, transparent)`, background: on ? `color-mix(in srgb, ${st.color} 22%, transparent)` : 'transparent' }}>
             <div className="text-[11px] font-black uppercase tracking-wider" style={{ color: st.color }}>{st.label}</div>
@@ -93,7 +94,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   const [title, setTitle] = useState(src?.title ?? '');
   const [description, setDescription] = useState(src?.description ?? '');
   const [categoryIds, setCategoryIds] = useState<number[]>(src?.categoryIds ?? []);
-  const [difficulty, setDifficulty] = useState<Difficulty>(src?.difficulty ?? 'normal');
+  const [difficulty, setDifficulty] = useState<Difficulty>(editingHabit?.nextDifficulty?.difficulty ?? src?.difficulty ?? 'normal');
   // habit
   const [days, setDays] = useState(editingHabit?.days ?? '0123456');
   const [deadlineTime, setDeadlineTime] = useState(editingHabit?.deadlineTime ?? '');
@@ -167,10 +168,12 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
       {/* Stakes are set once: an existing quest hides them, an existing habit shows them locked. */}
       {!editingQuest && (
         <Field label={`Difficulty — XP gained / lost${kind === 'quest' && boss === 'boss' ? ` (×${BOSS_MULTIPLIER} boss)` : ''}`}>
-          <DifficultyPicker value={difficulty} onChange={setDifficulty} multiplier={kind === 'quest' && boss === 'boss' ? BOSS_MULTIPLIER : 1} locked={!!editingHabit && !fresh} />
+          <DifficultyPicker value={difficulty} onChange={setDifficulty} multiplier={kind === 'quest' && boss === 'boss' ? BOSS_MULTIPLIER : 1} min={editingHabit && !fresh ? editingHabit.difficulty : undefined} />
           {editingHabit && (fresh
             ? <p className="mt-1.5 text-xs text-muted">Still changeable until {formatDateTime(editingHabit.freeEditUntil)} (its first hour). Then it locks.</p>
-            : <p className="mt-1.5 text-xs text-muted">Locked once a habit is created, so the stakes can't be lowered before a fail.</p>)}
+            : difficulty !== editingHabit.difficulty
+              ? <p className="mt-1.5 text-xs text-ink2">{DIFFICULTY_STYLE[difficulty].label} from {formatDay(addDayStr(s.today, 1))}. Today stays {DIFFICULTY_STYLE[editingHabit.difficulty].label}.</p>
+              : <p className="mt-1.5 text-xs text-muted">Can be raised (from the next day), never lowered.</p>)}
         </Field>
       )}
 
