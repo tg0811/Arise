@@ -136,7 +136,9 @@ export async function api<T = AppState>(method: string, path: string, body?: unk
 }
 
 export const useAppState = () =>
-  useQuery({ queryKey: ['state'], queryFn: () => api('GET', '/state'), refetchInterval: 60_000, refetchOnWindowFocus: true });
+  // Every action already returns the fresh state; this refresh picks up changes made elsewhere
+  // (another device, midnight settlement). Coming back to the app refreshes immediately too.
+  useQuery({ queryKey: ['state'], queryFn: () => api('GET', '/state'), refetchInterval: 30_000, refetchOnWindowFocus: true });
 
 /** Mutation that replaces the cached state with the server's response. */
 export function useAction() {
