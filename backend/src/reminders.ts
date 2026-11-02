@@ -55,12 +55,24 @@ export function vapidKeys(db: DB): { publicKey: string; privateKey: string } {
   return keys;
 }
 
-export function webPushSender(db: DB): Sender {
+/**
+ * How every push is sent. `urgency: 'high'` matters on Android: at the default "normal" urgency Google's push
+ * service holds messages while the phone dozes (screen off) and delivers them when it next wakes, so a 07:00
+ * reminder could arrive when you happen to open the phone. Reminders are time-sensitive and always shown.
+ */
+export function pushOptions(db: DB): webpush.RequestOptions {
   const { publicKey, privateKey } = vapidKeys(db);
   const subject = process.env.VAPID_SUBJECT ?? 'mailto:arise@localhost';
+  return { vapidDetails: { subject, publicKey, privateKey }, TTL: 3600, urgency: 'high' };
+}
+
+export function webPushSender(db: DB): Sender {
+  const options = pushOptions(db);
   return async (subscription, message) => {
     try {
-      await webpush.sendNotification(subscription, JSON.stringify(message), { vapidDetails: { subject, publicKey, privateKey }, TTL: 3600 });
+      await webpush.sendNotification(subscription, JSON.stringify(message), options);
+      // One line per push, so a late notification can be traced: sent on time here → the phone held it.
+      console.log(`push sent ${new Date().toISOString()} ${message.tag}`);
       return { gone: false };
     } catch (e: any) {
       if (e?.statusCode === 404 || e?.statusCode === 410) return { gone: true };

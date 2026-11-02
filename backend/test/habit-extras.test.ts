@@ -46,3 +46,14 @@ test('reminder: at its time on its days only, only while undone, once, even in q
   h.advance(1);
   assert.deepEqual((await tags()).filter((t) => t.startsWith('remind')), []);
 });
+
+test('pushes go out with high urgency (Android otherwise holds them while the phone dozes)', async () => {
+  const webpush = (await import('web-push')).default;
+  const { pushOptions } = await import('../src/reminders.ts');
+  const h = harness();
+  const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/x', keys: {
+    p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' } };
+  const req = webpush.generateRequestDetails(sub, 'x', pushOptions(h.db));
+  assert.equal(req.headers.Urgency, 'high');
+  assert.equal(req.headers.TTL, 3600);
+});

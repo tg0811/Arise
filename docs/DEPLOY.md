@@ -160,6 +160,7 @@ It asks for your SSH key's passphrase **once** (one shared connection for every 
 |---|---|
 | App logs | `docker compose logs app --tail 100 -f` |
 | Container status | `docker ps --filter name=arise` (the container is named `arise`) |
+| When pushes were sent | `docker compose logs app --since 24h \| grep 'push sent'` (times are UTC; compare with when the notification arrived) |
 | Restart | `docker compose restart app` |
 | Stop | `docker compose down` (data stays in `data/`) |
 | nginx errors | `sudo tail -50 /var/log/nginx/error.log` |
