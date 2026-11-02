@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Undo2, Flame, Clock, Pencil, Skull, Crown, Link2, Trash2, Lock, LockOpen, CalendarDays } from 'lucide-react';
+import { Check, X, Undo2, Flame, Clock, Pencil, Skull, Crown, Link2, Trash2, Lock, LockOpen, CalendarDays, Bell } from 'lucide-react';
 import { UnlockSheet } from './Private';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AppState, Habit, Quest } from '../lib/api';
@@ -107,6 +107,7 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
             {h.description && <p className="mt-0.5 text-sm text-ink2">{h.description}</p>}
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className="inline-flex items-center gap-1 font-semibold text-ink2"><CalendarDays size={12} /> {daysLabel(h.days)}</span>
+            {h.reminderTime && !resolved && <span className="inline-flex items-center gap-1 font-semibold text-ink2" title="Reminder"><Bell size={12} /> {h.reminderTime}</span>}
               {h.deadlineTime && (
                 <span className={`inline-flex items-center gap-1 font-semibold ${late ? 'text-bad' : 'text-ink2'}`}>
                   <Clock size={12} /> by {h.deadlineTime}{late && ' · late'}
@@ -266,6 +267,7 @@ export function TaskDetail({ s, task, onEdit }: { s: AppState; task: { kind: 'ha
           <>
             <Fact label="Repeats">{daysLabel(task.h.days)}</Fact>
             {task.h.startsOn > s.today && <Fact label="Starts">{formatDay(task.h.startsOn)}</Fact>}
+            <Fact label="Reminder">{task.h.reminderTime ?? 'None'}</Fact>
             <Fact label="Deadline">{task.h.deadlineTime ? `by ${task.h.deadlineTime}` : 'End of day'}</Fact>
             <Fact label="Streak"><span className="inline-flex items-center gap-1"><Flame size={13} className="text-gold" />{task.h.streak} day{task.h.streak === 1 ? '' : 's'}</span>{task.h.multiplier > 1 && <span className="ml-1.5 text-accent2">×{task.h.multiplier}</span>}</Fact>
             <Fact label="XP"><span className="text-good">+{task.h.xpGain}</span> / <span className="text-bad">−{task.h.xpLoss}</span></Fact>

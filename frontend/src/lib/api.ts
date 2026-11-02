@@ -5,7 +5,7 @@ import type { Difficulty, GoalType, LootType, Mood, Rank, ReminderPrefs } from '
 export interface Category { id: number; name: string; color: string; icon: string; sort: number; xp: number; level: number; into: number; need: number; pct: number }
 export interface Habit {
   id: number; title: string; description: string; /** Every category it trains (full XP to each). */ categoryIds: number[]; difficulty: Difficulty;
-  days: string; deadlineTime: string | null; scheduledToday: boolean;
+  days: string; deadlineTime: string | null; /** Push reminder time on its days (HH:MM). */ reminderTime: string | null; scheduledToday: boolean;
   /** First day it counts (YYYY-MM-DD; tomorrow if created with "starts tomorrow"). Until `freeEditUntil` it can be fixed freely. */
   startsOn: string; freeEditUntil: string;
   /** A raise waiting to start (raises apply from the next day; difficulty never goes down). */

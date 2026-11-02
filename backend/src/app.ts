@@ -69,6 +69,7 @@ const HabitBody = z.object({
   difficulty,
   days: z.string().regex(/^[0-6]{1,7}$/).default('0123456'),
   deadlineTime: hhmm.nullable().default(null),
+  reminderTime: hhmm.nullable().default(null),
   private: z.boolean().default(false),
   /** On create: the first day it counts, YYYY-MM-DD (today or later). `startsTomorrow` is the older shorthand. */
   startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -364,9 +365,11 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const start = b.startsOn ?? (b.startsTomorrow ? addDays(todayStr, 1) : todayStr);
     if (start < todayStr) throw new HttpError(400, "A habit can't start in the past");
     if (start > addDays(todayStr, 366)) throw new HttpError(400, 'Pick a start date within a year');
-    db.prepare(`INSERT INTO tasks (kind, title, description, category_id, category_ids, difficulty, days, deadline_time, private, created_at, created_date)
-      VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.private ? 1 : 0, at.toISOString(), start);
+    // New habits go to the end of your order.
+    const sort = (db.prepare("SELECT COALESCE(MAX(sort), -1) + 1 AS n FROM tasks WHERE kind = 'habit'").get() as { n: number }).n;
+    db.prepare(`INSERT INTO tasks (kind, title, description, category_id, category_ids, difficulty, days, deadline_time, reminder_time, private, sort, created_at, created_date)
+      VALUES ('habit', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), b.difficulty, b.days, b.deadlineTime, b.reminderTime, b.private ? 1 : 0, sort, at.toISOString(), start);
     return c.json(state(c));
   });
 
@@ -390,9 +393,9 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     else if (b.difficulty !== h.next_difficulty) stakes = { ...stakes, next: b.difficulty, from: addDays(date, 1) };
     const keep = !fresh && habitDue(h, date) && !isScheduled(b.days, date) && !db.prepare('SELECT 1 FROM habit_logs WHERE task_id = ? AND date = ?').get(h.id, date);
     db.prepare(`UPDATE tasks SET title = ?, description = ?, category_id = ?, category_ids = ?, difficulty = ?, next_difficulty = ?, next_difficulty_from = ?,
-      days = ?, deadline_time = ?, private = ?, kept_date = ? WHERE id = ?`)
+      days = ?, deadline_time = ?, reminder_time = ?, private = ?, kept_date = ? WHERE id = ?`)
       .run(b.title, b.description, cats[0] ?? null, JSON.stringify(cats), stakes.difficulty, stakes.next, stakes.from,
-        b.days, b.deadlineTime, b.private ? 1 : 0, keep ? date : h.kept_date, h.id);
+        b.days, b.deadlineTime, b.reminderTime, b.private ? 1 : 0, keep ? date : h.kept_date, h.id);
     return c.json(state(c));
   });
 

@@ -98,6 +98,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
   // habit
   const [days, setDays] = useState(editingHabit?.days ?? '0123456');
   const [deadlineTime, setDeadlineTime] = useState(editingHabit?.deadlineTime ?? '');
+  const [reminderTime, setReminderTime] = useState(editingHabit?.reminderTime ?? '');
   const [isPrivate, setIsPrivate] = useState(src?.private ?? false);
   // A new habit added in the evening usually can't be done today (e.g. "Wake up at 5:30"): default to tomorrow.
   const tomorrow = addDayStr(s.today, 1);
@@ -115,7 +116,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
     const done = { onSuccess: () => { toast('Saved', 'good'); onDone(); }, onError: (e: Error) => toast(e.message, 'bad') };
     if (kind === 'habit') {
       if (!days) return toast('Pick at least one day', 'bad');
-      const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, private: isPrivate, ...(editingHabit ? {} : { startsOn }) };
+      const body = { title, description, categoryIds, difficulty, days, deadlineTime: deadlineTime || null, reminderTime: reminderTime || null, private: isPrivate, ...(editingHabit ? {} : { startsOn }) };
       action.mutate(editingHabit ? { method: 'PUT', path: `/habits/${editingHabit.id}`, body } : { path: '/habits', body }, done);
     } else {
       const deadlineAt = editingQuest && deadline === toLocalInput(new Date(editingQuest.deadlineAt)) ? editingQuest.deadlineAt : new Date(deadline).toISOString();
@@ -193,6 +194,16 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
               })}
             </div>
             {editingHabit && !fresh && <p className="mt-1.5 text-xs text-muted">Changes apply from tomorrow. If it's due today, it stays due today.</p>}
+          </Field>
+          <Field label="Reminder (optional)">
+            <div className="flex gap-2">
+              <input type="time" className="field" aria-label="Reminder time" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} />
+              {reminderTime && <Button variant="ghost" onClick={() => setReminderTime('')}>Clear</Button>}
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              {s.reminders.devices === 0 ? 'Turn on notifications in Settings to get it. ' : !s.reminders.enabled ? 'Reminders are switched off in Settings. ' : ''}
+              A notification at this time on its days, only if it isn't done yet.
+            </p>
           </Field>
           <Field label="Deadline time (optional)">
             <div className="flex gap-2">

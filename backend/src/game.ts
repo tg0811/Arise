@@ -76,6 +76,8 @@ export interface Task {
   /** A raised difficulty waiting to start, and the day it starts (raises apply from tomorrow). */
   next_difficulty: Difficulty | null;
   next_difficulty_from: string | null;
+  /** Habit reminder (HH:MM), sent on its days while it's undone. */
+  reminder_time: string | null;
   difficulty: Difficulty;
   days: string;
   deadline_time: string | null;
@@ -543,7 +545,7 @@ export function buildState(ctx: Ctx) {
     const nextMultiplier = streakMultiplier(before + 1);
     return {
       ...maskTask(ctx, h),
-      days: h.days, deadlineTime: h.deadline_time, scheduledToday: habitDue(h, todayStr),
+      days: h.days, deadlineTime: h.deadline_time, reminderTime: h.reminder_time, scheduledToday: habitDue(h, todayStr),
       startsOn: h.created_date, freeEditUntil: freeRemoveUntil(h.created_at),
       log: log ? { status: log.status, xp: log.xp } : null,
       streak, multiplier: nextMultiplier,

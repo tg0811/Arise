@@ -109,6 +109,22 @@ test('habit that starts tomorrow is not due today and says when it starts', asyn
   await expect(page.getByRole('button', { name: `Ten-day challenge · starts ${ddmmyyyy}` })).toBeVisible();
 });
 
+test('habit order can be changed; a habit can have a reminder time', async () => {
+  await page.getByRole('button', { name: 'Reorder habits' }).click();
+  const rows = sheet().getByRole('listitem');
+  await expect(rows.first()).toContainText('Read 30 pages');
+  await sheet().getByRole('button', { name: 'Move Ten-day challenge up' }).click();
+  await sheet().getByRole('button', { name: 'Move Ten-day challenge up' }).click();
+  await expect(rows.first()).toContainText('Ten-day challenge');
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  const card = page.locator('div.glass', { hasText: 'Read 30 pages' }).first();
+  await card.getByRole('button', { name: 'Edit', exact: true }).click();
+  await sheet().getByLabel('Reminder time').fill('07:00');
+  await sheet().getByRole('button', { name: 'Save' }).click();
+  await expect(card.getByTitle('Reminder')).toHaveText('07:00');
+});
+
 test('quest: the quest section Add opens on the Quest tab; clearing pays XP and credits', async () => {
   await page.getByText('No active quests').click();
   await expect(page.getByPlaceholder('Finish the API refactor')).toBeVisible();

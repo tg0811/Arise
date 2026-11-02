@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Moon, Target, ChevronRight, Timer, Orbit } from 'lucide-react';
+import { Plus, Moon, Target, ChevronRight, Timer, Orbit, ArrowUpDown, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import { FocusForm } from '../components/Focus';
 import { PrivateUnlockedBar } from '../components/Private';
 import { LootboxButton } from '../components/Lootbox';
 import { Countdown } from '../components/Countdown';
 import { DAY_CLEAR_RATIO } from '@shared';
 import { daysLabel, formatDate, formatDay } from '../lib/time';
-import type { AppState, Habit } from '../lib/api';
+import { useAction, type AppState, type Habit } from '../lib/api';
 import { HabitCard, QuestCard, TaskDetail } from '../components/TaskCards';
 import { TaskForm } from '../components/TaskForm';
-import { Panel, ProgressBar, SectionTitle, Sheet } from '../components/ui';
+import { Panel, ProgressBar, SectionTitle, Sheet, useToast } from '../components/ui';
 
 // What the task sheet shows: a new task (starting on the tab you came from), or one habit/quest by id,
 // either its details (`edit: false`) or its form. By id, so the sheet follows live state updates.
@@ -19,6 +19,7 @@ type Editing = { kind: 'new'; as: 'habit' | 'quest' } | { kind: 'habit' | 'quest
 export function Today({ s }: { s: AppState }) {
   const [editing, setEditing] = useState<Editing>(null);
   const [focusOpen, setFocusOpen] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
   const todayHabits = s.habits.filter((h) => h.scheduledToday);
   const restHabits = s.habits.filter((h) => !h.scheduledToday);
   // Unresolved first, then done, then failed.
@@ -92,7 +93,16 @@ export function Today({ s }: { s: AppState }) {
         </Link>
       )}
 
-      <SectionTitle right={<span className="text-xs font-bold text-muted">{todayHabits.filter((h) => h.log).length}/{todayHabits.length}</span>}>Daily Habits</SectionTitle>
+      <SectionTitle right={
+        <span className="flex items-center gap-3">
+          <span className="text-xs font-bold text-muted">{todayHabits.filter((h) => h.log).length}/{todayHabits.length}</span>
+          {s.habits.length > 1 && (
+            <button onClick={() => setOrderOpen(true)} className="inline-flex items-center gap-1 text-xs font-bold text-accent" aria-label="Reorder habits">
+              <ArrowUpDown size={13} /> Reorder
+            </button>
+          )}
+        </span>
+      }>Daily Habits</SectionTitle>
       {sortedHabits.length === 0 ? (
         <EmptyHint text="No habits today. Add the disciplines you want to hold yourself to." onAdd={() => setEditing({ kind: 'new', as: 'habit' })} />
       ) : (
@@ -135,6 +145,10 @@ export function Today({ s }: { s: AppState }) {
         <Plus size={26} />
       </button>
 
+      <Sheet open={orderOpen} onClose={() => setOrderOpen(false)} title="Habit order">
+        {orderOpen && <HabitOrder habits={s.habits} />}
+      </Sheet>
+
       <Sheet open={focusOpen} onClose={() => setFocusOpen(false)} title="Focus session">
         {focusOpen && <FocusForm s={s} onDone={() => setFocusOpen(false)} />}
       </Sheet>
@@ -151,6 +165,33 @@ export function Today({ s }: { s: AppState }) {
           )
         )}
       </Sheet>
+    </div>
+  );
+}
+
+/** All habits (resting ones too) with up/down arrows. Today's list follows this order within done/undone. */
+function HabitOrder({ habits }: { habits: Habit[] }) {
+  const action = useAction();
+  const toast = useToast();
+  const move = (i: number, dir: -1 | 1) => {
+    const ids = habits.map((h) => h.id);
+    [ids[i], ids[i + dir]] = [ids[i + dir], ids[i]];
+    action.mutate({ path: '/habits/reorder', body: { ids } }, { onError: (e) => toast(e.message, 'bad') });
+  };
+  return (
+    <div>
+      <ul className="divide-y divide-line">
+        {habits.map((h, i) => (
+          <li key={h.id} className="flex items-center gap-3 py-2.5">
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {h.masked ? <span className="inline-flex items-center gap-1.5 tracking-widest text-ink2"><Lock size={13} /> {h.title}</span> : h.title}
+            </span>
+            <button disabled={i === 0 || action.isPending} onClick={() => move(i, -1)} className="rounded-lg p-1.5 text-muted hover:text-ink disabled:opacity-20" aria-label={`Move ${h.masked ? 'private habit' : h.title} up`}><ChevronUp size={18} /></button>
+            <button disabled={i === habits.length - 1 || action.isPending} onClick={() => move(i, 1)} className="rounded-lg p-1.5 text-muted hover:text-ink disabled:opacity-20" aria-label={`Move ${h.masked ? 'private habit' : h.title} down`}><ChevronDown size={18} /></button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted">Today's list keeps this order, with unfinished habits first.</p>
     </div>
   );
 }

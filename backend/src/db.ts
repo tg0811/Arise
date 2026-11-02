@@ -305,6 +305,8 @@ const MIGRATIONS: string[] = [
   ALTER TABLE tasks ADD COLUMN next_difficulty TEXT;
   ALTER TABLE tasks ADD COLUMN next_difficulty_from TEXT;
   `,
+  // 14: optional per-habit reminder time (HH:MM), pushed on its days while it's still undone.
+  `ALTER TABLE tasks ADD COLUMN reminder_time TEXT;`,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

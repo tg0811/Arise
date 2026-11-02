@@ -146,6 +146,17 @@ export function dueReminders(ctx: Ctx): PushMessage[] {
     setSetting(db, 'last_reminder_at', at.toISOString());
   }
 
+  // Habit reminders at the time you chose: only on its days, only while it's undone, once a day.
+  // Your own exact time, so quiet hours don't apply. Up to an hour late if the server missed the minute.
+  for (const h of openHabits) {
+    if (!h.reminder_time) continue;
+    const late = nowMin - minuteOfDay(h.reminder_time);
+    if (late >= 0 && late <= 60 && once(db, `remind:${h.id}:${today}`, at)) {
+      const name = h.private ? '🔒 Private habit' : `🔔 ${h.title}`;
+      out.push({ title: name, body: h.deadline_time ? `Reminder: due by ${h.deadline_time}.` : 'Reminder: still to do today.', tag: `remind-${h.id}`, url: '/' });
+    }
+  }
+
   if (prefs.nudgeMinutes > 0) {
     // Habit "by HH:MM" nudges
     for (const h of openHabits) {
