@@ -65,7 +65,7 @@ function Overview({ s, a }: { s: AppState; a: ArchiveData }) {
           ['Days active', o.daysActive, o.firstDay ? `since ${formatDate(o.firstDay)}` : ''],
           ['Quests cleared', o.questsCleared, ''],
           ['Goals conquered', o.goalsConquered, ''],
-          ['Payloads opened', o.payloadsOpened, ''],
+          ['Random Boxes opened', o.payloadsOpened, ''],
           ['Reviews written', o.reviews, ''],
           ['Credits earned (all time)', o.creditsEarned.toLocaleString(), ''],
           ['Rewards redeemed', o.itemsRedeemed, ''],

@@ -6,11 +6,14 @@ import { RANK_COLORS, rankColor } from '../lib/theme';
 import { sfx } from '../lib/sound';
 import { GenerativeArt } from './fx';
 import { SRankCutscene } from './SRankCutscene';
+import { useCelebrationsHeld } from '../lib/celebrate';
 
 const SRANK_SEEN = 'sl-srank-seen';
 const seenSRank = () => { try { return localStorage.getItem(SRANK_SEEN) === '1'; } catch { return false; } };
 
 type Change = { kind: 'up' | 'down'; level: number; rank: Rank; title: string; rankChanged: boolean };
+/** A detected change waiting to be shown (while e.g. the Random Box reveal is on screen). */
+type Pending = { change: Change; cutscene: boolean };
 
 /**
  * Watches level/rank between state updates and plays a full-screen splash over LevelUp-style
@@ -18,8 +21,10 @@ type Change = { kind: 'up' | 'down'; level: number; rank: Rank; title: string; r
  */
 export function LevelChange({ s }: { s: AppState | undefined }) {
   const prev = useRef<{ level: number; rank: Rank } | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [change, setChange] = useState<Change | null>(null);
   const [cutscene, setCutscene] = useState(false);
+  const held = useCelebrationsHeld();
 
   useEffect(() => {
     if (!s) return;
@@ -28,17 +33,29 @@ export function LevelChange({ s }: { s: AppState | undefined }) {
     prev.current = cur;
     if (!p || p.level === cur.level) return;
     const kind = cur.level > p.level ? 'up' : 'down';
-    const rankChanged = p.rank !== cur.rank;
-    if (kind === 'up' && rankChanged && cur.rank === 'S' && !seenSRank()) {
+    // Several changes while held merge into one: the latest level, and a rank change if any happened.
+    setPending((old) => {
+      const rankChanged = p.rank !== cur.rank || !!old?.change.rankChanged;
+      const cutscene = (kind === 'up' && p.rank !== cur.rank && cur.rank === 'S' && !seenSRank()) || !!old?.cutscene;
+      return { change: { kind, level: cur.level, rank: cur.rank, title: s.progress.title, rankChanged }, cutscene };
+    });
+  }, [s]);
+
+  // Play it once nothing else is on screen.
+  useEffect(() => {
+    if (!pending || held) return;
+    setPending(null);
+    const c = pending.change;
+    if (pending.cutscene) {
       sfx.rankUp();
       setCutscene(true);
       return;
     }
-    if (kind === 'down') sfx.fall();
-    else if (rankChanged) sfx.rankUp();
+    if (c.kind === 'down') sfx.fall();
+    else if (c.rankChanged) sfx.rankUp();
     else sfx.levelUp();
-    setChange({ kind, level: cur.level, rank: cur.rank, title: s.progress.title, rankChanged });
-  }, [s]);
+    setChange(c);
+  }, [pending, held]);
 
   useEffect(() => {
     if (!change) return;

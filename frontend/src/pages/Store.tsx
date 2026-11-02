@@ -65,7 +65,7 @@ export function Store({ s }: { s: AppState }) {
           <SectionTitle>Owned</SectionTitle>
           {s.inventory.owned.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line px-6 py-8 text-center text-sm text-muted">
-              Empty. Buy rewards in the store, or win them from the daily payload.
+              Empty. Buy rewards in the store, or win them from the Random Box.
             </div>
           ) : (
             <div className="space-y-2">
@@ -91,7 +91,7 @@ export function Store({ s }: { s: AppState }) {
                 {s.inventory.used.map((u) => (
                   <div key={u.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                     <Check size={14} className="text-good" />
-                    <span className="flex-1 text-ink2">{u.name}{u.source === 'lootbox' && <span className="ml-1.5 text-xs text-gold">(payload)</span>}</span>
+                    <span className="flex-1 text-ink2">{u.name}{u.source === 'lootbox' && <span className="ml-1.5 text-xs text-gold">(Random Box)</span>}</span>
                     <span className="text-xs text-muted">{formatDate(u.usedAt)}</span>
                   </div>
                 ))}
@@ -153,12 +153,12 @@ function ItemForm({ item, onDone }: { item: StoreItem | null; onDone: () => void
             ))}
           </div>
         </div>
-        <p className="mt-1.5 text-xs text-muted">For scale: a Normal task pays 5 credits, a Hard one 10. Gems only drop from the daily payload.</p>
+        <p className="mt-1.5 text-xs text-muted">For scale: a Normal task pays 5 credits, a Hard one 10. Gems only drop from the Random Box.</p>
       </Field>
       <label className="mb-5 flex items-start gap-3 text-sm">
         <input type="checkbox" checked={lootable} onChange={(e) => setLootable(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--sl-accent)]" />
         <span>
-          Can be won free from the daily payload
+          Can be won free from the Random Box
           <span className="block text-xs text-muted">Untick for big rewards you want to earn only by saving up.</span>
         </span>
       </label>

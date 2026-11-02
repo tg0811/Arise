@@ -64,6 +64,6 @@ export const sfx = {
   }),
   /** Level/rank lost: minor descent. */
   fall: () => play((ac, t) => [440, 349.2, 293.7, 220].forEach((f, i) => note(ac, f, t + i * 0.14, 0.7, 0.14, 'sine'))),
-  /** Payload opened: sparkle. */
+  /** Random Box opened: sparkle. */
   loot: () => play((ac, t) => [1046.5, 1318.5, 1568, 2093].forEach((f, i) => note(ac, f, t + i * 0.05, 0.4, 0.08))),
 };

@@ -114,7 +114,7 @@ export function Rules({ s }: { s: AppState }) {
           <Rule>The multiplier boosts only what you <i>gain</i>. A fail always costs the base amount, and it resets that habit's streak to 0.</Rule>
           <Rule><b className="text-ink">🔥 Daily streak:</b> consecutive days where you completed at least <b className="text-ink">{clear}</b> of that day's tasks (habits and quests due that day).</Rule>
           <Rule>Days with no tasks at all are neutral: they don't break the streak.</Rule>
-          <Rule>Clearing {clear} also unlocks the <b className="text-ink">daily payload</b> (see 6), and a longer streak makes it richer.</Rule>
+          <Rule>Clearing {clear} also unlocks the <b className="text-ink">Random Box</b> (see 7), and a longer streak makes it richer.</Rule>
         </ul>
       </Panel>
 
@@ -143,12 +143,12 @@ export function Rules({ s }: { s: AppState }) {
           rows={GOAL_SIZES.map((g) => [g.label, <span className="text-good">+{g.xp}</span>, <span className="text-bad">−{g.xp}</span>, `+${Math.round(g.xp * GOAL_LATE_SHARE)}`])} />
       </Panel>
 
-      <SectionTitle>7 · Daily payload</SectionTitle>
+      <SectionTitle>7 · Random Box</SectionTitle>
       <Panel className="p-4">
         <ul className="mb-3 space-y-2">
           <Rule>Unlocks once {clear} of today's tasks are complete. One opening per day; it doesn't carry over.</Rule>
           <Rule>Streak bonus: +{pct(LOOT_STREAK_BONUS_PER_DAY)} per streak day on credits and XP (max +{pct(LOOT_STREAK_BONUS_CAP)}), and +1 gem per {LOOT_GEM_STREAK_STEP} streak days. Yours right now: +{pct(lootStreakBonus(s.streak.current))}.</Rule>
-          <Rule>Item drops pick a random store reward ticked "Can be won free from the daily payload". Untick your big rewards so only saving up gets them.</Rule>
+          <Rule>Item drops pick a random store reward ticked "Can be won free from the Random Box". Untick your big rewards so only saving up gets them.</Rule>
         </ul>
         <Table head={['Drop', 'Chance', 'Amount']}
           rows={LOOT_ODDS.map((o) => [<span className="capitalize">{o.type}</span>, pct(o.chance), o.type === 'item' ? '1 reward' : `${o.min}–${o.max}`])} />
@@ -158,9 +158,9 @@ export function Rules({ s }: { s: AppState }) {
       <Panel className="p-4">
         <ul className="space-y-2">
           <Rule>The store holds <b className="text-ink">real-world rewards</b> that you price yourself. Buying moves one into your inventory; <b className="text-ink">Use</b> means you go enjoy it.</Rule>
-          <Rule>Credits come from completing tasks and goals. Gems are rare and only drop from the payload, so price your biggest treats in gems.</Rule>
+          <Rule>Credits come from completing tasks and goals. Gems are rare and only drop from the Random Box, so price your biggest treats in gems.</Rule>
           <Rule>Writing an <b className="text-ink">after-action review</b> for a conquered or past-due goal earns +{JOURNAL_AAR_XP} Mind XP (once per goal). Free notes earn nothing; they're just for you.</Rule>
-          <Rule><b className="text-ink">Titles</b> are earned by milestones, never luck: streaks, tasks completed, bosses, chains, goals, reviews, payloads, max level, and an Adept (Lv 10) and Master (Lv 25) title for every category. Once earned, a title is yours even if the streak behind it breaks. Equip one on the Character page. You have {s.titles.filter((t) => t.unlocked).length} of {s.titles.length}.</Rule>
+          <Rule><b className="text-ink">Titles</b> are earned by milestones, never luck: streaks, tasks completed, bosses, chains, goals, reviews, Random Boxes, max level, and an Adept (Lv 10) and Master (Lv 25) title for every category. Once earned, a title is yours even if the streak behind it breaks. Equip one on the Character page. You have {s.titles.filter((t) => t.unlocked).length} of {s.titles.length}.</Rule>
         </ul>
       </Panel>
 
