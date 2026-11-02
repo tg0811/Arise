@@ -84,6 +84,10 @@ test('habit: create with several categories, see its days, open details, edit, c
 
   const edited = page.locator('div.glass', { hasText: 'Read 30 pages' }).first();
   await edited.getByRole('button', { name: 'Complete', exact: true }).click();
+  await edited.getByRole('button', { name: 'Cancel' }).click(); // one tap alone completes nothing
+  await expect(edited.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
+  await edited.getByRole('button', { name: 'Complete', exact: true }).click();
+  await edited.getByRole('button', { name: /^Confirm complete/ }).click();
   await expect(edited.getByText(/^\+\d+ XP$/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Close' })).toHaveCount(0); // Complete must not open the card
   await edited.getByRole('button', { name: 'Undo' }).click();
@@ -132,6 +136,7 @@ test('quest: the quest section Add opens on the Quest tab; clearing pays XP and 
   await button('Accept quest').click();
   const card = page.locator('div.glass', { hasText: 'Pay the electricity bill' }).first();
   await card.getByRole('button', { name: 'Clear', exact: true }).click();
+  await card.getByRole('button', { name: /^Confirm clear/ }).click();
   await expect(card.getByText('+25 XP')).toBeVisible();
 });
 

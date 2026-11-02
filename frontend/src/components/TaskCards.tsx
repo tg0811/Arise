@@ -72,7 +72,8 @@ function isLate(deadline: string | null) {
 
 export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
   const run = useTaskAction();
-  const [confirmFail, setConfirmFail] = useState(false);
+  // Both outcomes take a second tap: no XP is won or lost by a stray touch.
+  const [confirm, setConfirm] = useState<null | 'complete' | 'fail'>(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
   const resolved = h.log !== null;
   const late = !resolved && isLate(h.deadlineTime);
@@ -128,19 +129,27 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
             <button onClick={() => run(`/habits/${h.id}/undo`, 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
               <Undo2 size={13} /> Undo
             </button>
-          ) : confirmFail ? (
+          ) : confirm === 'fail' ? (
             <>
-              <button onClick={() => { setConfirmFail(false); run(`/habits/${h.id}/fail`, `−${h.xpLoss} XP. Rise again tomorrow.`, 'bad'); }}
+              <button onClick={() => { setConfirm(null); run(`/habits/${h.id}/fail`, `−${h.xpLoss} XP. Rise again tomorrow.`, 'bad'); }}
                 className="flex-1 rounded-xl border border-bad/50 bg-bad/15 py-2 text-sm font-bold text-bad">Confirm fail</button>
-              <button onClick={() => setConfirmFail(false)} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink2">Cancel</button>
+              <button onClick={() => setConfirm(null)} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink2">Cancel</button>
+            </>
+          ) : confirm === 'complete' ? (
+            <>
+              <button onClick={() => { setConfirm(null); run(`/habits/${h.id}/complete`, `+${h.xpGain} XP`, 'good'); }}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/60 bg-good/20 py-2 text-sm font-bold text-good">
+                <Check size={16} /> Confirm complete (+{h.xpGain} XP)
+              </button>
+              <button onClick={() => setConfirm(null)} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink2">Cancel</button>
             </>
           ) : (
             <>
-              <button onClick={() => run(`/habits/${h.id}/complete`, `+${h.xpGain} XP`, 'good')}
+              <button onClick={() => setConfirm('complete')}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/40 bg-good/10 py-2 text-sm font-bold text-good active:scale-95">
                 <Check size={16} /> Complete
               </button>
-              <button onClick={() => setConfirmFail(true)}
+              <button onClick={() => setConfirm('fail')}
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-bad/30 px-4 py-2 text-sm font-bold text-bad/80 active:scale-95">
                 <X size={16} /> Fail
               </button>
@@ -157,7 +166,7 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
 export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
   const run = useTaskAction();
   const qc = useQueryClient();
-  const [confirm, setConfirm] = useState<null | 'fail' | 'delete'>(null);
+  const [confirm, setConfirm] = useState<null | 'clear' | 'fail' | 'delete'>(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
   const unlock = () => setUnlockOpen(true);
   const pending = q.status === 'pending';
@@ -203,6 +212,14 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
                 <Undo2 size={13} /> Undo
               </button>
             )
+          ) : confirm === 'clear' ? (
+            <>
+              <button onClick={() => { setConfirm(null); run(`/quests/${q.id}/complete`, `Quest cleared! +${q.xp} XP`, 'good'); }}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/60 bg-good/20 py-2 text-sm font-bold text-good">
+                <Check size={16} /> Confirm clear (+{q.xp} XP)
+              </button>
+              <button onClick={() => setConfirm(null)} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink2">Cancel</button>
+            </>
           ) : confirm ? (
             <>
               <button
@@ -218,15 +235,15 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
             </>
           ) : (
             <>
-              <button onClick={() => run(`/quests/${q.id}/complete`, `Quest cleared! +${q.xp} XP`, 'good')}
+              <button onClick={() => setConfirm('clear')}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/40 bg-good/10 py-2 text-sm font-bold text-good active:scale-95">
                 <Check size={16} /> Clear
               </button>
               <button onClick={() => setConfirm('fail')} className="rounded-xl border border-bad/30 px-3 py-2 text-sm font-bold text-bad/80" aria-label="Abandon"><X size={16} /></button>
               {/* Free removal is for the first hour only (typos); after that a quest can only be abandoned. */}
-            {Date.now() < Date.parse(q.freeRemoveUntil) && (
-              <button onClick={() => (q.masked ? unlock() : setConfirm('delete'))} className="rounded-xl border border-line px-3 py-2 text-sm text-muted" aria-label="Remove"><Trash2 size={15} /></button>
-            )}
+              {Date.now() < Date.parse(q.freeRemoveUntil) && (
+                <button onClick={() => (q.masked ? unlock() : setConfirm('delete'))} className="rounded-xl border border-line px-3 py-2 text-sm text-muted" aria-label="Remove"><Trash2 size={15} /></button>
+              )}
             </>
           )}
         </div>
