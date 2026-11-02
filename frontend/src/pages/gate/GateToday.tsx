@@ -97,7 +97,7 @@ function TodayPlan({ g }: { g: Gate }) {
         ))}
       </ul>
       <Button className="mt-5 w-full" onClick={start} disabled={action.isPending}><Swords size={16} /> Start workout</Button>
-      <p className="mt-2 text-center text-xs text-muted">+50 Body XP when finished · missing it costs 50 at midnight</p>
+      <p className="mt-2 text-center text-xs text-muted">+50 XP when finished (trains Body) · missing it costs 50 at midnight</p>
     </Panel>
   );
 }
@@ -132,7 +132,7 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
 
   const finish = () =>
     action.mutate({ path: '/session/finish', body: {} }, {
-      onSuccess: () => { sfx.complete(); toast(session.scheduled ? 'Workout complete: +50 Body XP' : 'Extra session logged', 'good'); },
+      onSuccess: () => { sfx.complete(); toast(session.scheduled ? 'Workout complete: +50 XP (trains Body)' : 'Extra session logged', 'good'); },
       onError: (e) => toast(e.message, 'bad'),
     });
 
@@ -141,7 +141,7 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
       <Panel className="p-6 text-center">
         <Trophy size={32} className="mx-auto text-accent2" />
         <h2 className="mt-3 font-display text-xl font-bold tracking-wider">{session.title} cleared</h2>
-        <p className="mt-1 text-sm text-ink2">{doneSets} sets{session.scheduled ? ' · +50 Body XP' : ' · extra session'}</p>
+        <p className="mt-1 text-sm text-ink2">{doneSets} sets{session.scheduled ? ' · +50 XP (trains Body)' : ' · extra session'}</p>
         <button onClick={() => action.mutate({ path: '/session/undo' })} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink2">
           <Undo2 size={13} /> Reopen (mis-tap)
         </button>

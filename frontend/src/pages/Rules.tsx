@@ -232,7 +232,7 @@ export function Rules({ s }: { s: AppState }) {
       <Panel className="p-4">
         <ul className="space-y-2">
           <Rule>Plan your week in the Instant Dungeon: each weekday is a workout day (with exercises) or a rest day.</Rule>
-          <Rule>Finishing a planned workout gives <b className="text-good">+{WORKOUT_XP} Body XP</b> (and credits). A planned workout not finished by midnight costs <b className="text-bad">−{WORKOUT_XP}</b>. Rest days are neutral.</Rule>
+          <Rule>Finishing a planned workout gives <b className="text-good">+{WORKOUT_XP} XP</b>, counting toward your level like any task, and it trains <b className="text-ink">Body</b> (plus credits). A planned workout not finished by midnight costs <b className="text-bad">−{WORKOUT_XP}</b>. Rest days are neutral.</Rule>
           <Rule>Workout days count toward the daily {clear} clear, just like a task. Extra sessions on rest days are logged (PRs, history) but give no XP.</Rule>
           <Rule><b className="text-ink">Weekly streak:</b> a week counts only if every planned workout in it was done. This week never breaks the streak until a workout is actually missed.</Rule>
           <Rule>Records: heaviest weight, most reps, estimated 1RM (weight × (1 + reps ÷ 30)), longest distance and time.</Rule>
