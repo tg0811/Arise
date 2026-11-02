@@ -48,17 +48,22 @@
   .diagram .no { stroke: var(--bad); stroke-width: 2; fill: none; stroke-dasharray: 5 4; marker-end: url(#ahbad); }
   .diagram .lbl { font-size: 11px; fill: var(--ink2); }
   .ok { color: var(--good); font-weight: 600; } .x { color: var(--bad); font-weight: 600; }
+  .diagram .lane { stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 3 5; }
+  .diagram .step { font-size: 11px; font-weight: 700; fill: var(--accent); }
+  .diagram .msg { font-size: 12px; fill: var(--ink); }
+  .diagram .note { font-size: 11px; fill: var(--muted); }
+  .diagram .good { fill: var(--good); font-weight: 700; }
   footer { margin-top: 3em; color: var(--muted); font-size: .85rem; }
 </style>
 </head>
 <body>
 <main>
   <h1>How Arise runs on the server</h1>
-  <p class="lede">A beginner's guide to the pieces behind <code>https://89-167-82-104.sslip.io</code>: ports, firewalls, nginx, HTTPS and certbot, Docker, and how one tap on your phone travels through all of them.</p>
+  <p class="lede">A beginner's guide to the pieces behind <code>https://89-167-82-104.sslip.io</code>: ports, firewalls, nginx, HTTPS and certbot, Docker, and how one tap on your phone travels through all of them. Plus how the fingerprint lock keeps your data yours.</p>
   <nav class="toc">
     <a href="#building">The building</a><a href="#ports">Ports</a><a href="#firewall">Firewall</a><a href="#nginx">nginx</a>
     <a href="#caddy">Caddy</a><a href="#https">HTTPS &amp; certbot</a><a href="#docker">Docker</a><a href="#forwarding">Port forwarding</a>
-    <a href="#journey">A request's journey</a><a href="#deploy">Deploying</a><a href="#glossary">Cheat sheet</a>
+    <a href="#journey">A request's journey</a><a href="#deploy">Deploying</a><a href="#fingerprint">Fingerprint lock</a><a href="#glossary">Cheat sheet</a>
   </nav>
 
   <h2 id="building"><span class="tag">Big picture</span> Your server is an office building</h2>
@@ -181,6 +186,123 @@
   </ol>
   <p class="muted">nginx and the certificate don't change on updates. They were set up once, following <code>docs/DEPLOY.md</code>.</p>
 
+
+  <h2 id="fingerprint"><span class="tag">Your key</span> The fingerprint lock (passkeys)</h2>
+  <p>Arise can lock itself after 5 minutes away and open again with your fingerprint. This section explains what actually happens when you touch the sensor, and why it's safe.</p>
+
+  <div class="card analogy">
+    <p><b>The analogy: a royal seal.</b> Imagine a king with a unique wax seal. He keeps the seal locked in a vault, and only he can open the vault. He gives the palace guards a <b>picture of the seal's pattern</b>.</p>
+    <ul>
+      <li>When a letter arrives, the guards compare the wax stamp to their picture. If it matches, the letter really came from the king.</li>
+      <li>The picture is useless for making new stamps: copying it or stealing it gets you nothing.</li>
+      <li>The guards never need the seal itself, so the seal never leaves the vault.</li>
+    </ul>
+    <p>In Arise: the <b>seal</b> is a secret key inside your phone, the <b>vault</b> is your phone's security chip, <b>opening the vault</b> is your fingerprint, and the <b>picture</b> is the "public key" the server keeps.</p>
+  </div>
+
+  <h3 style="margin-top:1.6em">The two keys</h3>
+  <table>
+    <tr><th>Key</th><th>Where it lives</th><th>What it can do</th></tr>
+    <tr><td><b>Private key</b> (the seal)</td><td>Inside your phone's security chip. It <b>never leaves</b>, not even to Google or Arise.</td><td>Sign things. Only after your fingerprint, face or screen PIN unlocks it.</td></tr>
+    <tr><td><b>Public key</b> (the picture)</td><td>On the Arise server, in the <code>passkeys</code> table.</td><td>Check signatures. It can't create one, so a stolen copy is harmless.</td></tr>
+  </table>
+  <p>Together they're called a <b>passkey</b>. The standard behind it is <b>WebAuthn</b>, the same technology banks, Google and GitHub use for fingerprint login.</p>
+
+  <h3 style="margin-top:1.6em">Your fingerprint never leaves the phone</h3>
+  <p>The phone reads your fingerprint, compares it to the one you registered in the phone's own settings, and only says <b>"yes, that's the owner"</b> to its security chip. Arise and the server never receive your fingerprint, a picture of it, or any data about it. They only ever see a signature made by the chip.</p>
+
+  <h3 style="margin-top:1.6em">Step 1, once per device: setting it up</h3>
+  <p>You tap <b>Settings → App lock → Set up fingerprint on this device</b>:</p>
+  <svg class="diagram" viewBox="0 0 480 400" role="img" aria-label="Setting up a passkey: the phone asks, the server sends a random challenge, you touch the sensor, the chip creates a key pair, the phone sends only the public key, and the server stores it.">
+    <rect class="hl" x="20" y="10" width="160" height="44" rx="10"/><text x="100" y="37" text-anchor="middle" font-weight="700">📱 Your phone</text>
+    <rect class="hl" x="300" y="10" width="160" height="44" rx="10"/><text x="380" y="37" text-anchor="middle" font-weight="700">🖥 Arise server</text>
+    <line class="lane" x1="100" y1="54" x2="100" y2="390"/><line class="lane" x1="380" y1="54" x2="380" y2="390"/>
+
+    <text class="step" x="110" y="86">1</text><text class="msg" x="240" y="86" text-anchor="middle">"Set up a fingerprint, please"</text>
+    <path class="arrow" d="M104,94 L374,94"/>
+
+    <text class="step" x="110" y="132">2</text><text class="msg" x="240" y="132" text-anchor="middle">a random one-time code (challenge)</text>
+    <path class="arrow" d="M376,140 L106,140"/>
+
+    <rect class="box" x="20" y="158" width="250" height="78" rx="10"/>
+    <text class="step" x="32" y="180">3</text>
+    <text class="msg" x="48" y="180">You touch the sensor.</text>
+    <text class="msg" x="48" y="198">The chip creates a brand-new</text>
+    <text class="msg" x="48" y="216">key pair just for Arise.</text>
+
+    <text class="step" x="110" y="266">4</text><text class="msg" x="240" y="266" text-anchor="middle">public key + the code, signed</text>
+    <path class="arrow" d="M104,274 L374,274"/>
+    <text class="note" x="240" y="292" text-anchor="middle">(the private key stays in the chip)</text>
+
+    <rect class="box" x="230" y="312" width="230" height="62" rx="10"/>
+    <text class="step" x="242" y="334">5</text>
+    <text class="msg" x="258" y="334">Checks the signature, then</text>
+    <text class="msg" x="258" y="352">saves the public key.</text>
+    <text class="good" x="258" y="368" font-size="11">✓ Lock turns on</text>
+  </svg>
+
+  <h3 style="margin-top:1.6em">Step 2, every time: unlocking</h3>
+  <p>After 5 minutes away, opening Arise shows <b>"UNLOCK TO ARISE"</b> and the fingerprint prompt appears by itself:</p>
+  <svg class="diagram" viewBox="0 0 480 430" role="img" aria-label="Unlocking: the phone asks to unlock, the server sends a fresh random challenge, you touch the sensor and the chip signs it, the phone sends only the signature, the server checks it with the stored public key and starts sending data again.">
+    <rect class="hl" x="20" y="10" width="160" height="44" rx="10"/><text x="100" y="37" text-anchor="middle" font-weight="700">📱 Your phone</text>
+    <rect class="hl" x="300" y="10" width="160" height="44" rx="10"/><text x="380" y="37" text-anchor="middle" font-weight="700">🖥 Arise server</text>
+    <line class="lane" x1="100" y1="54" x2="100" y2="420"/><line class="lane" x1="380" y1="54" x2="380" y2="420"/>
+
+    <text class="step" x="110" y="86">1</text><text class="msg" x="240" y="86" text-anchor="middle">"Unlock, please"</text>
+    <path class="arrow" d="M104,94 L374,94"/>
+
+    <text class="step" x="110" y="132">2</text><text class="msg" x="240" y="132" text-anchor="middle">a <tspan font-weight="700">fresh</tspan> random code, new every time</text>
+    <path class="arrow" d="M376,140 L106,140"/>
+
+    <rect class="box" x="20" y="158" width="250" height="78" rx="10"/>
+    <text class="step" x="32" y="180">3</text>
+    <text class="msg" x="48" y="180">You touch the sensor.</text>
+    <text class="msg" x="48" y="198">The chip stamps (signs) the</text>
+    <text class="msg" x="48" y="216">code with the private key.</text>
+
+    <text class="step" x="110" y="266">4</text><text class="msg" x="240" y="266" text-anchor="middle">only the signature</text>
+    <path class="arrow" d="M104,274 L374,274"/>
+
+    <rect class="box" x="230" y="294" width="230" height="62" rx="10"/>
+    <text class="step" x="242" y="316">5</text>
+    <text class="msg" x="258" y="316">Checks the stamp against the</text>
+    <text class="msg" x="258" y="334">saved public key. Match?</text>
+    <text class="good" x="258" y="350" font-size="11">✓ This device is unlocked</text>
+
+    <text class="step" x="110" y="388">6</text><text class="msg" x="240" y="388" text-anchor="middle">your habits, XP, everything</text>
+    <path class="arrow" d="M376,396 L106,396"/>
+  </svg>
+  <p><b>Why a fresh random code every time?</b> So an old signature is worthless. Even if someone recorded a past unlock, replaying it fails, because the server now asks to sign a different code. It's like a bank asking for a new OTP each time instead of accepting yesterday's.</p>
+
+  <h3 style="margin-top:1.6em">Why the lock lives on the server</h3>
+  <p>There are two ways to build an app lock:</p>
+  <ul>
+    <li><b>A curtain (weak):</b> the phone loads all your data, then covers it with a "Locked" picture. The data is already on the phone; someone skilled could look behind the curtain.</li>
+    <li><b>A safe (what Arise does):</b> while locked, the server answers every request with <b>"locked, no data"</b> (the code is <code>423</code>). The phone has nothing to show until step 5 succeeds. The app also clears what it had in memory as soon as it locks. There's nothing behind the curtain.</li>
+  </ul>
+
+  <h3 style="margin-top:1.6em">The 5-minute rule</h3>
+  <ul>
+    <li>Every time the app talks to the server, the 5-minute timer restarts. While Arise is open on screen, it checks in every 30 seconds, so it stays unlocked while you use it.</li>
+    <li>Close it, switch to another app, or let the screen sleep for 5 minutes, and the server marks this device as locked.</li>
+    <li>Each device is locked separately: unlocking your phone doesn't unlock your laptop.</li>
+  </ul>
+
+  <h3 style="margin-top:1.6em">Fallbacks and special cases</h3>
+  <table>
+    <tr><th>Situation</th><th>What happens</th></tr>
+    <tr><td>Sensor fails, wet finger, you're wearing gloves</td><td>Tap <b>Use password instead</b>. Your password always works.</td></tr>
+    <tr><td>A device without a fingerprint set up (e.g. a laptop)</td><td>It still locks after 5 minutes, and unlocks with your password. Laptops with Windows Hello or Touch ID can set up their own passkey too.</td></tr>
+    <tr><td>Private habits and quests</td><td>The <b>Use fingerprint</b> button shows them for 5 minutes, same as typing the password.</td></tr>
+    <tr><td>You get a new phone</td><td>Log in with the password, then set up the fingerprint again on the new phone. Remove the old phone's passkey in Settings → App lock.</td></tr>
+    <tr><td>Your phone is lost or stolen</td><td>The thief would need your fingerprint, face or phone PIN to use the passkey. To be safe, open Arise on another device and remove that phone's passkey in Settings, or change your password, which also signs out every other device.</td></tr>
+    <tr><td>Arise moves to a new domain</td><td>Passkeys are tied to the site's name, so set the fingerprint up again on the new address.</td></tr>
+  </table>
+
+  <div class="card">
+    <p><b>A bonus: passkeys can't be phished.</b> Each passkey belongs to one site name (<code>89-167-82-104.sslip.io</code>). If a fake look-alike site asked your phone for a signature, the phone would refuse, because the name doesn't match. A typed password can be tricked out of you; a passkey can't.</p>
+  </div>
+
   <h2 id="glossary"><span class="tag">Cheat sheet</span> One line each</h2>
   <table>
     <tr><td><b>IP address</b></td><td>The server's street address: <code>89.167.82.104</code>.</td></tr>
@@ -198,6 +320,12 @@
     <tr><td><b>Port mapping</b></td><td>The hole from a server port into a container's port.</td></tr>
     <tr><td><b>localhost / 127.0.0.1</b></td><td>"This same machine". Not reachable from the internet.</td></tr>
     <tr><td><b>SSH</b></td><td>Secure remote terminal into the server (door 22).</td></tr>
+    <tr><td><b>Passkey</b></td><td>A key pair that replaces typing a password: unlocked by your fingerprint, face or phone PIN.</td></tr>
+    <tr><td><b>WebAuthn</b></td><td>The web standard browsers and phones use for passkeys.</td></tr>
+    <tr><td><b>Private key</b></td><td>The secret half of a passkey. Lives in your phone's security chip; never leaves it.</td></tr>
+    <tr><td><b>Public key</b></td><td>The shareable half the server stores. It can check signatures but never make one.</td></tr>
+    <tr><td><b>Challenge</b></td><td>A random one-time code the server asks the phone to sign, so old signatures can't be replayed.</td></tr>
+    <tr><td><b>App lock</b></td><td>Arise refusing to send any data to a device until it's unlocked (after 5 minutes away).</td></tr>
   </table>
 
   <footer>Arise · docs/how-it-works.html · companion to <code>docs/DEPLOY.md</code></footer>
