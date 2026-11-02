@@ -17,7 +17,7 @@ export function Plan() {
   return (
     <div>
       <p className="mb-4 text-sm text-ink2">
-        {scheduledCount ? `${scheduledCount} workout day${scheduledCount > 1 ? 's' : ''} a week.` : 'No workout days yet.'} Each finished workout day is +50 XP (trains Body); a missed one is −50. A week counts toward your streak only if every workout day in it is done.
+        {scheduledCount ? `${scheduledCount} workout day${scheduledCount > 1 ? 's' : ''} a week.` : 'No workout days yet.'} Each finished workout day is +50 XP; a missed one is −50. A week counts toward your streak only if every workout day in it is done.
       </p>
       <div className="space-y-3">
         {g.plan.map((d) => <DayCard key={d.weekday} d={d} onAdd={() => setAdding(d.weekday)} />)}
