@@ -78,7 +78,7 @@ export function Settings({ s }: { s: AppState }) {
             cm
           </label>
         </div>
-        <p className="mt-4 text-xs text-muted">Timezone: {s.profile.timezone} — days roll over at midnight here.</p>
+        <p className="mt-4 text-xs text-muted">Timezone: {s.profile.timezone}</p>
       </Panel>
 
       <SectionTitle right={<button onClick={() => setEditingCat('new')} className="inline-flex items-center gap-1 text-xs font-bold text-accent"><Plus size={13} /> Add</button>}>
