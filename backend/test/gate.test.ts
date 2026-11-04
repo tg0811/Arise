@@ -152,3 +152,14 @@ test('editing a set\'s numbers never unticks it (no done field = keep)', async (
   const after = r.gate.session.exercises[0].sets[0];
   assert.deepEqual([after.kg, after.done], [62.5, true]);
 });
+
+test('re-creating a removed exercise by name brings it back instead of a duplicate', async () => {
+  const { h, bench } = await withPlan();
+  await h.call('DELETE', `/api/gate/exercises/${bench}`);
+  const r = await h.call('POST', '/api/gate/exercises', { name: 'bench press', kind: 'strength', muscle: 'Upper chest' });
+  assert.equal(r.id, bench, 'same exercise, history kept');
+  const ex = r.gate.exercises.filter((e: any) => e.name.toLowerCase() === 'bench press');
+  assert.equal(ex.length, 1);
+  assert.equal(ex[0].archived, false);
+  assert.equal(ex[0].muscle, 'Upper chest');
+});

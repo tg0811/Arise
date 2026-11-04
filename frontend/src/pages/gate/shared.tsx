@@ -58,7 +58,7 @@ export function ExercisePicker({ g, onPick, busy }: { g: Gate; onPick: (id: numb
         ))}
         {list.length === 0 && !q && <p className="py-4 text-center text-sm text-muted">Your library is empty. Type a name above to create your first exercise.</p>}
       </div>
-      {q.trim() && !g.exercises.some((e) => e.name.toLowerCase() === q.trim().toLowerCase()) && (
+      {q.trim() && !g.exercises.some((e) => !e.archived && e.name.toLowerCase() === q.trim().toLowerCase()) && (
         creating ? (
           <div className="mt-3 rounded-xl border border-line p-3">
             <p className="mb-2 text-sm font-semibold">New: {q.trim()}</p>

@@ -139,6 +139,9 @@ export function Today({ s }: { s: AppState }) {
         </>
       )}
 
+      {/* Room to scroll the last card clear of the floating Add button. */}
+      <div aria-hidden className="h-20" />
+
       <button onClick={() => setEditing({ kind: 'new', as: 'habit' })} aria-label="Add"
         className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_0_24px_color-mix(in_srgb,var(--sl-accent)_60%,transparent)] transition active:scale-90 md:bottom-8 md:right-8"
         style={{ background: 'linear-gradient(135deg, var(--sl-accent), var(--sl-accent2))' }}>

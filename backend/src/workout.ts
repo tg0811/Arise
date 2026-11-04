@@ -81,7 +81,13 @@ function getExercise(db: DB, id: number): ExerciseRow {
   return e;
 }
 
+/** Creating a name you removed earlier brings that exercise back (with its history) instead of a duplicate. */
 export function createExercise(ctx: Ctx, e: { name: string; kind: ExerciseKind; muscle: string }): number {
+  const old = ctx.db.prepare('SELECT id FROM exercises WHERE archived = 1 AND lower(name) = lower(?) ORDER BY id DESC LIMIT 1').get(e.name) as { id: number } | undefined;
+  if (old) {
+    ctx.db.prepare('UPDATE exercises SET archived = 0, name = ?, kind = ?, muscle = ? WHERE id = ?').run(e.name, e.kind, e.muscle, old.id);
+    return old.id;
+  }
   const res = ctx.db.prepare('INSERT INTO exercises (name, kind, muscle, created_at) VALUES (?, ?, ?, ?)').run(e.name, e.kind, e.muscle, ctx.at.toISOString());
   return Number(res.lastInsertRowid);
 }
