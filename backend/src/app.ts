@@ -29,6 +29,7 @@ import {
   addExerciseToSession, addPlanItem, addSet, archiveExercise, createExercise, discardSession, finishSession, gateState,
   removePlanItem, removeSet, reorderPlanItems, startSession as startWorkout, undoFinish, updateDay, updateExercise, updatePlanItem, updateSet,
 } from './workout.ts';
+import { logRun, removeRun, runsState } from './runs.ts';
 
 const difficulty = z.enum(DIFFICULTIES as [string, ...string[]]);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -146,6 +147,12 @@ const ExerciseBody = z.object({
   name: z.string().trim().min(1).max(60),
   kind: z.enum(EXERCISE_KINDS as [string, ...string[]]).default('strength'),
   muscle: z.string().trim().max(40).default(''),
+});
+const RunBody = z.object({
+  distance: z.number().positive().max(500),
+  unit: z.enum(['km', 'mi']).default('km'),
+  seconds: z.number().int().min(60).max(48 * 3600),
+  note: z.string().trim().max(200).default(''),
 });
 const num = (max: number) => z.number().min(0).max(max).nullable().default(null);
 const PlanItemBody = z.object({
@@ -597,7 +604,7 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const cx = ctx(req);
     settle(cx);
     fn?.(cx);
-    return { gate: gateState(cx), state: fullState(cx) };
+    return { gate: { ...gateState(cx), runs: runsState(cx) }, state: fullState(cx) };
   };
   app.get('/api/gate', (c) => c.json(gate(c)));
 
@@ -649,6 +656,13 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const { note } = z.object({ note: z.string().max(1000).default('') }).parse(await c.req.json().catch(() => ({})));
     return c.json(gate(c, (cx) => finishSession(cx, note)));
   });
+  app.post('/api/gate/runs', async (c) => {
+    const b = RunBody.parse(await c.req.json());
+    let rid = 0;
+    const out = gate(c, (cx) => { rid = logRun(cx, b); });
+    return c.json({ ...out, id: rid });
+  });
+  app.delete('/api/gate/runs/:id', (c) => c.json(gate(c, (cx) => removeRun(cx, id(c.req.param('id'))))));
   app.post('/api/gate/session/undo', (c) => c.json(gate(c, (cx) => undoFinish(cx))));
   app.delete('/api/gate/session', (c) => c.json(gate(c, (cx) => discardSession(cx))));
 

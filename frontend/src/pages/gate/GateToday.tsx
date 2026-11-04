@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Check, X, Plus, Trash2, Timer, Undo2, Swords, Moon, Trophy, CalendarDays } from 'lucide-react';
 import { e1rm } from '@shared';
@@ -7,6 +8,8 @@ import { sfx } from '../../lib/sound';
 import { Button, Panel, Sheet, useToast } from '../../components/ui';
 import { ExercisePicker, KindIcon, WEEKDAY_NAMES, targetText } from './shared';
 import { weekdayName } from '../../lib/time';
+import { holdCelebrations } from '../../lib/celebrate';
+import { ClearSplash } from './effects';
 
 const REST_SECONDS = 90;
 
@@ -130,14 +133,35 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
   const doneSets = session.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
   const totalSets = session.exercises.reduce((n, e) => n + e.sets.length, 0);
 
-  const finish = () =>
+  // The clear splash plays first; a level-up earned by this workout waits until it closes.
+  const [cleared, setCleared] = useState<{ title: string; sets: number; minutes: string; scheduled: boolean } | null>(null);
+  const release = useRef<(() => void) | null>(null);
+  const closeSplash = useCallback(() => { setCleared(null); release.current?.(); release.current = null; }, []);
+  useEffect(() => () => release.current?.(), []);
+
+  const finish = () => {
+    release.current = holdCelebrations();
+    const summary = { title: session.title, sets: doneSets, minutes: elapsed, scheduled: session.scheduled };
     action.mutate({ path: '/session/finish', body: {} }, {
-      onSuccess: () => { sfx.complete(); toast(session.scheduled ? 'Workout complete: +50 XP · +10 credits' : 'Extra session logged', 'good'); },
-      onError: (e) => toast(e.message, 'bad'),
+      onSuccess: () => { sfx.levelUp(); setCleared(summary); },
+      onError: (e) => { closeSplash(); toast(e.message, 'bad'); },
     });
+  };
+
+  const splash = (
+    <AnimatePresence>
+      {cleared && (
+        <ClearSplash kicker={cleared.scheduled ? 'Dungeon cleared' : 'Extra session logged'} title={cleared.title.toUpperCase()}
+          detail={`${cleared.sets} set${cleared.sets === 1 ? '' : 's'} · ${cleared.minutes}`}
+          rewards={cleared.scheduled ? ['+50 XP', '+10 credits'] : undefined} onClose={closeSplash} />
+      )}
+    </AnimatePresence>
+  );
 
   if (!active) {
     return (
+      <>
+      {splash}
       <Panel className="p-6 text-center">
         <Trophy size={32} className="mx-auto text-accent2" />
         <h2 className="mt-3 font-display text-xl font-bold tracking-wider">{session.title} cleared</h2>
@@ -146,11 +170,13 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
           <Undo2 size={13} /> Reopen (mis-tap)
         </button>
       </Panel>
+      </>
     );
   }
 
   return (
     <div>
+      {splash}
       <div className="mb-3 flex items-end justify-between">
         <div>
           <p className="label">{session.scheduled ? 'In the Dungeon' : 'Extra session'}</p>

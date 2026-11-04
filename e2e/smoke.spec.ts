@@ -186,7 +186,7 @@ test('store: add a reward, buy it with quest credits, use it from the inventory'
   await expect(page.getByText(/enjoy it, you earned it/)).toBeVisible();
 });
 
-test('instant dungeon: enter, switch tabs, return to Arise', async () => {
+test('instant dungeon: enter, switch tabs, record a run, return to Arise', async () => {
   await page.goto('/');
   await page.getByRole('link', { name: /Dungeon/ }).first().click();
   await expect(page.getByRole('heading', { name: 'INSTANT DUNGEON' })).toBeVisible();
@@ -194,6 +194,20 @@ test('instant dungeon: enter, switch tabs, return to Arise', async () => {
   for (const tab of ['Plan', 'History', 'Exercises', 'Today']) {
     await page.getByRole('link', { name: tab, exact: true }).last().click();
   }
+  // Runs: distance + time → pace, recorded after a confirm, +70 XP once a day
+  await page.getByRole('link', { name: 'Runs', exact: true }).last().click();
+  await page.getByPlaceholder('e.g. 5').fill('5');
+  await page.getByLabel('min').fill('27');
+  await page.getByLabel('sec').fill('30');
+  await expect(page.getByText('5:30/km', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Record run · \+70 XP/ }).click();
+  await page.getByRole('button', { name: /Confirm 5 km · 27:30/ }).click();
+  await expect(page.getByText(/Run recorded: \+70 XP/)).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '5 KM' })).toBeVisible(); // the "Run complete" splash
+  await page.getByText('Tap to continue').click();
+  await expect(page.getByRole('dialog', { name: '5 KM' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Remove run' })).toBeVisible();
+  await page.getByRole('link', { name: 'Today', exact: true }).last().click();
   await page.getByRole('button', { name: 'Arise' }).click();
   await expect(page.getByText('Daily Habits')).toBeVisible();
   await expect(page.locator('html')).not.toHaveAttribute('data-dimension', 'gate');

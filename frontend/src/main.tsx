@@ -30,6 +30,7 @@ import { GateToday } from './pages/gate/GateToday';
 import { Plan as GatePlan } from './pages/gate/Plan';
 import { GateHistory } from './pages/gate/History';
 import { Exercises as GateExercises } from './pages/gate/Exercises';
+import { Runs as GateRuns } from './pages/gate/Runs';
 import { AmbientParticles } from './components/fx';
 
 const queryClient = new QueryClient({
@@ -56,6 +57,7 @@ function Game() {
         <Route path="gate" element={<GateLayout />}>
           <Route index element={<GateToday />} />
           <Route path="plan" element={<GatePlan />} />
+          <Route path="runs" element={<GateRuns />} />
           <Route path="history" element={<GateHistory />} />
           <Route path="exercises" element={<GateExercises />} />
         </Route>

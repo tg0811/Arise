@@ -307,6 +307,19 @@ const MIGRATIONS: string[] = [
   `,
   // 14: optional per-habit reminder time (HH:MM), pushed on its days while it's still undone.
   `ALTER TABLE tasks ADD COLUMN reminder_time TEXT;`,
+  `
+  -- 15: runs, recorded in the Instant Dungeon (separate from workout sessions). Distance is kept as entered (km or mi).
+  CREATE TABLE runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    at TEXT NOT NULL,
+    distance REAL NOT NULL,
+    unit TEXT NOT NULL DEFAULT 'km',
+    seconds INTEGER NOT NULL,
+    note TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX runs_date ON runs(date);
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

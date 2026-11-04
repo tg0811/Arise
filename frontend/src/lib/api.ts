@@ -168,8 +168,11 @@ export interface GateHistory {
   id: number; date: string; title: string; status: 'active' | 'done' | 'missed'; scheduled: boolean; minutes: number | null; note: string;
   sets: number; volume: number; prs: number; exercises: { name: string; sets: GateSet[] }[];
 }
+export type RunUnit = 'km' | 'mi';
+export interface Run { id: number; date: string; at: string; distance: number; unit: RunUnit; seconds: number; note: string; km: number; pace: number; xp: number }
 export interface Gate {
   today: string;
+  runs: { unit: RunUnit; list: Run[]; totalKm: number; longestKm: number; bestPaceKm: number | null };
   scheduleSince: string | null;
   plan: PlanDay[];
   week: { date: string; name: string; status: 'done' | 'missed' | 'planned' | 'rest' | 'active' | 'extra'; isToday: boolean }[];

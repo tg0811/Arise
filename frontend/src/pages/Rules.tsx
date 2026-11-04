@@ -6,7 +6,7 @@ import {
   MAX_LEVEL, MOOD_TIERS, RANKS, STREAK_TIERS, WEEKLY_BOSS_SHARE, attributeLevel, creditsFor, rankForLevel,
   totalXpForLevel, weeklyBossXp, xpToNext,
   GOAL_LATE_SHARE, GOAL_SIZES, JOURNAL_AAR_XP, LOOT_GEM_STREAK_STEP, LOOT_ODDS, LOOT_STREAK_BONUS_CAP, LOOT_STREAK_BONUS_PER_DAY, lootStreakBonus,
-  GATE_TITLE_WEEKS, WORKOUT_XP,
+  GATE_TITLE_WEEKS, RUN_MIN_KM, RUN_XP, WORKOUT_XP,
 } from '@shared';
 import type { AppState } from '../lib/api';
 import { DIFFICULTY_STYLE, rankColor } from '../lib/theme';
@@ -228,13 +228,14 @@ export function Rules({ s }: { s: AppState }) {
         <p className="mt-2 text-xs text-muted">With no history yet, you start Steady.</p>
       </Panel>
 
-      <SectionTitle>13 · The Instant Dungeon (workouts)</SectionTitle>
+      <SectionTitle>13 · The Instant Dungeon (workouts &amp; runs)</SectionTitle>
       <Panel className="p-4">
         <ul className="space-y-2">
           <Rule>Plan your week in the Instant Dungeon: each weekday is a workout day (with exercises) or a rest day.</Rule>
           <Rule>Finishing a planned workout gives <b className="text-good">+{WORKOUT_XP} XP</b>, counting toward your level like any task, and it trains <b className="text-ink">Body</b> (plus credits). A planned workout not finished by midnight costs <b className="text-bad">−{WORKOUT_XP}</b>. Rest days are neutral.</Rule>
           <Rule>Workout days count toward the daily {clear} clear, just like a task. Extra sessions on rest days are logged (PRs, history) but give no XP.</Rule>
           <Rule><b className="text-ink">Weekly streak:</b> a week counts only if every planned workout in it was done. This week never breaks the streak until a workout is actually missed.</Rule>
+          <Rule><b className="text-ink">Runs:</b> record the distance (km or miles) and time; the pace is worked out for you. The first run of the day of at least {RUN_MIN_KM} km gives <b className="text-good">+{RUN_XP} XP</b> to <b className="text-ink">Body</b> (plus credits). More runs that day are kept in your history without XP. Runs are logged for today only, and can be removed the same day if you made a typo. Missing a run costs nothing.</Rule>
           <Rule>Records: heaviest weight, most reps, estimated 1RM (weight × (1 + reps ÷ 30)), longest distance and time.</Rule>
           <Rule>Titles: Dungeon Initiate (first workout), Iron Disciple ({GATE_TITLE_WEEKS.iron}-week streak), Dungeon Breaker ({GATE_TITLE_WEEKS.breaker}-week streak), Centurion of Iron (100 workouts).</Rule>
         </ul>

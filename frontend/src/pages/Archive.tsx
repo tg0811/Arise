@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { CheckCircle2, Swords, Flame, Skull, Trophy, Coins, Gem, ShoppingBag, Sparkles, XCircle, ScrollText, Gift, Loader2, Lock, LockOpen } from 'lucide-react';
+import { CheckCircle2, Swords, Flame, Skull, Trophy, Coins, Gem, ShoppingBag, Sparkles, XCircle, ScrollText, Gift, Footprints, Loader2, Lock, LockOpen } from 'lucide-react';
 import { useArchive, type AppState, type Archive as ArchiveData, type DayStat, type HabitStreak, type HistoryEvent } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
 import { formatDate, formatDay } from '../lib/time';
@@ -89,6 +89,7 @@ function eventIcon(e: HistoryEvent) {
   if (e.source === 'journal') return <ScrollText size={14} className="text-ink2" />;
   if (e.source === 'goal' || e.source === 'goal_penalty') return <Trophy size={14} className="text-ink2" />;
   if (e.source === 'quest') return <Swords size={14} className="text-ink2" />;
+  if (e.source === 'run') return <Footprints size={14} className="text-good" />;
   return e.amount >= 0 ? <CheckCircle2 size={14} className="text-good" /> : <XCircle size={14} className="text-bad" />;
 }
 

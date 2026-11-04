@@ -49,13 +49,14 @@ export const CategoryIcon = ({ name, size = 14, className }: { name: string; siz
 export function Panel({ children, className = '', brackets = true }: { children: ReactNode; className?: string; brackets?: boolean }) {
   return (
     <div className={`glass relative rounded-2xl ${className}`}>
+      {/* One wrapper with m-0: a panel's space-y-* margins must not shift the corners off the border. */}
       {brackets && (
-        <>
-          <span className="pointer-events-none absolute left-1.5 top-1.5 h-3 w-3 rounded-tl-md border-l-2 border-t-2 border-accent/60" />
-          <span className="pointer-events-none absolute right-1.5 top-1.5 h-3 w-3 rounded-tr-md border-r-2 border-t-2 border-accent/60" />
-          <span className="pointer-events-none absolute bottom-1.5 left-1.5 h-3 w-3 rounded-bl-md border-b-2 border-l-2 border-accent/60" />
-          <span className="pointer-events-none absolute bottom-1.5 right-1.5 h-3 w-3 rounded-br-md border-b-2 border-r-2 border-accent/60" />
-        </>
+        <span aria-hidden className="pointer-events-none absolute inset-0 m-0">
+          <span className="absolute left-1.5 top-1.5 h-3 w-3 rounded-tl-md border-l-2 border-t-2 border-accent/60" />
+          <span className="absolute right-1.5 top-1.5 h-3 w-3 rounded-tr-md border-r-2 border-t-2 border-accent/60" />
+          <span className="absolute bottom-1.5 left-1.5 h-3 w-3 rounded-bl-md border-b-2 border-l-2 border-accent/60" />
+          <span className="absolute bottom-1.5 right-1.5 h-3 w-3 rounded-br-md border-b-2 border-r-2 border-accent/60" />
+        </span>
       )}
       {children}
     </div>

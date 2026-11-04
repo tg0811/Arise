@@ -195,7 +195,7 @@ export function discardSession(ctx: Ctx) {
   });
 }
 
-const bodyCategory = (db: DB) =>
+export const bodyCategory = (db: DB) =>
   (db.prepare("SELECT id FROM categories WHERE archived = 0 AND lower(name) = 'body'").get() as { id: number } | undefined)?.id ?? null;
 
 export function finishSession(ctx: Ctx, note = '') {

@@ -231,6 +231,27 @@ export const EXERCISE_KINDS: ExerciseKind[] = ['strength', 'bodyweight', 'cardio
 /** Estimated one-rep max (Epley). */
 export const e1rm = (kg: number, reps: number) => (kg > 0 && reps > 0 ? Math.round(kg * (1 + reps / 30) * 10) / 10 : 0);
 
+// ---------------------------------------------------------------- runs
+
+/** A recorded run gives Body XP (harder than a workout). Only the first qualifying run of a day pays. */
+export const RUN_XP = 70;
+/** Shorter runs are still recorded, but give no XP. */
+export const RUN_MIN_KM = 1;
+/** Faster than this (min per km, a little under the world record) is a typo, not a run. */
+export const RUN_FASTEST_SEC_PER_KM = 150;
+export type RunUnit = 'km' | 'mi';
+export const KM_PER_MI = 1.609344;
+export const toKm = (distance: number, unit: RunUnit) => (unit === 'mi' ? distance * KM_PER_MI : distance);
+/** Seconds per km or per mile (whichever `distance` is in). */
+export const paceSeconds = (distance: number, seconds: number) => (distance > 0 ? seconds / distance : 0);
+/** 330 → "5:30", 3725 → "1:02:05". */
+export function formatDuration(totalSeconds: number) {
+  const t = Math.round(totalSeconds);
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+  const ss = String(sec).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
 /** Weekly streak milestones that unlock titles. */
 export const GATE_TITLE_WEEKS = { iron: 4, breaker: 12 };
 

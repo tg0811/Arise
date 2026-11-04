@@ -35,17 +35,17 @@
   color-scheme: dark;
 }
 
-/* The Instant Dungeon (workout dimension, internally "gate"): a crimson world. Same variables, different values,
-   so every component re-themes. Rank colours (--sl-rank) are untouched. */
+/* The Instant Dungeon (workout dimension, internally "gate"): the Shadow Monarch's world. Near-black violet with a cold
+   purple-blue glow. Same variables, different values, so every component re-themes. Rank colours (--sl-rank) are untouched. */
 :root[data-dimension="gate"] {
-  --sl-bg: #0b0506;
-  --sl-panel: #1c0b0e;
-  --sl-accent: #dc2626;
-  --sl-accent2: #f97316;
-  --sl-text: #fbf4f4;
-  --sl-text2: #c9a9a9;
-  --sl-muted: #8c6a6a;
-  --sl-line: rgba(220, 38, 38, 0.22);
+  --sl-bg: #05030b;
+  --sl-panel: #110c22;
+  --sl-accent: #8b5cf6;
+  --sl-accent2: #818cf8;
+  --sl-text: #f4f2ff;
+  --sl-text2: #b6aed6;
+  --sl-muted: #7a719c;
+  --sl-line: rgba(139, 92, 246, 0.26);
 }
 
 html, body, #root { min-height: 100%; }
@@ -133,3 +133,38 @@ input, textarea, select { font: inherit; color: inherit; }
 .spin-slow { animation: spin-slow 14s linear infinite; }
 
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ---------------------------------------------------------------- the Instant Dungeon's System windows
+   Everything below applies only inside the dungeon (data-dimension="gate"). Unlayered, so it wins over utilities. */
+
+/* Sharp, angular windows instead of soft rounded cards */
+:root[data-dimension="gate"] #root :is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) { border-radius: 4px; }
+:root[data-dimension="gate"] #root :is(.rounded-tl-md) { border-top-left-radius: 0; }
+:root[data-dimension="gate"] #root :is(.rounded-tr-md) { border-top-right-radius: 0; }
+:root[data-dimension="gate"] #root :is(.rounded-bl-md) { border-bottom-left-radius: 0; }
+:root[data-dimension="gate"] #root :is(.rounded-br-md) { border-bottom-right-radius: 0; }
+:root[data-dimension="gate"] #root .rounded-t-2xl { border-top-left-radius: 4px; border-top-right-radius: 4px; }
+:root[data-dimension="gate"] .field { border-radius: 3px; }
+
+/* Windows: a lit top edge and a deeper inner glow, like a System notification */
+:root[data-dimension="gate"] .glass {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sl-panel) 82%, transparent), color-mix(in srgb, var(--sl-bg) 70%, transparent));
+  box-shadow:
+    0 10px 36px rgba(0, 0, 0, 0.55),
+    0 0 18px color-mix(in srgb, var(--sl-accent) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--sl-accent) 55%, transparent),
+    inset 0 0 26px color-mix(in srgb, var(--sl-accent) 9%, transparent);
+}
+:root[data-dimension="gate"] .field:focus { box-shadow: 0 0 0 1px var(--sl-accent), 0 0 14px color-mix(in srgb, var(--sl-accent) 35%, transparent); }
+
+/* The dungeon's air: a faint grid and a low violet haze rising from below */
+:root[data-dimension="gate"] body::before {
+  background:
+    radial-gradient(ellipse 80% 45% at 50% 105%, color-mix(in srgb, var(--sl-accent) 20%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 0% 0%, color-mix(in srgb, var(--sl-accent2) 12%, transparent), transparent 70%),
+    linear-gradient(color-mix(in srgb, var(--sl-accent) 5%, transparent) 1px, transparent 1px) 0 0 / 100% 44px,
+    linear-gradient(90deg, color-mix(in srgb, var(--sl-accent) 5%, transparent) 1px, transparent 1px) 0 0 / 44px 100%;
+}
+
+/* Headings glow faintly, like System text */
+:root[data-dimension="gate"] #root .font-display { text-shadow: 0 0 14px color-mix(in srgb, var(--sl-accent) 45%, transparent); }
