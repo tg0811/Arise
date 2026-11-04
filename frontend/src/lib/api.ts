@@ -8,6 +8,8 @@ export interface Habit {
   days: string; deadlineTime: string | null; /** Push reminder time on its days (HH:MM). */ reminderTime: string | null; scheduledToday: boolean;
   /** First day it counts (YYYY-MM-DD; tomorrow if created with "starts tomorrow"). Until `freeEditUntil` it can be fixed freely. */
   startsOn: string; freeEditUntil: string;
+  /** A running or upcoming pause (travel etc.): while paused nothing is due and streaks skip the days. */
+  pause: { from: string; to: string | null } | null; pausedToday: boolean;
   /** A raise waiting to start (raises apply from the next day; difficulty never goes down). */
   nextDifficulty: { difficulty: Difficulty; from: string } | null;
   /** Private habit; `masked` while this device hasn't unlocked (title/description/category hidden). */
@@ -172,11 +174,15 @@ export type RunUnit = 'km' | 'mi';
 export interface Run { id: number; date: string; at: string; distance: number; unit: RunUnit; seconds: number; note: string; km: number; pace: number; xp: number }
 export interface Gate {
   today: string;
+  pause: { from: string; to: string | null } | null;
+  pausedToday: boolean;
   runs: { unit: RunUnit; list: Run[]; totalKm: number; longestKm: number; bestPaceKm: number | null };
   scheduleSince: string | null;
   plan: PlanDay[];
-  week: { date: string; name: string; status: 'done' | 'missed' | 'planned' | 'rest' | 'active' | 'extra'; isToday: boolean }[];
+  week: { date: string; name: string; status: 'done' | 'missed' | 'planned' | 'rest' | 'active' | 'extra' | 'paused'; isToday: boolean }[];
   todayPlan: PlanDay;
+  /** Today's weekday was edited today: today keeps the plan it had (changes apply from next week). */
+  planChangedToday: boolean;
   session: GateSession | null;
   history: GateHistory[];
   exercises: GateExercise[];

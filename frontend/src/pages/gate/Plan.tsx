@@ -3,6 +3,7 @@ import { Plus, ChevronUp, ChevronDown, X, Moon } from 'lucide-react';
 import { useGate, useGateAction, type PlanDay, type PlanItem } from '../../lib/api';
 import { Panel, Sheet, useToast } from '../../components/ui';
 import { ExercisePicker, KindIcon, WEEKDAY_NAMES } from './shared';
+import { PauseControl } from '../../components/PauseControl';
 
 // The weekly plan, Monday → Sunday. A day with exercises (and not marked Rest) is a workout day.
 
@@ -17,10 +18,16 @@ export function Plan() {
   return (
     <div>
       <p className="mb-4 text-sm text-ink2">
-        {scheduledCount ? `${scheduledCount} workout day${scheduledCount > 1 ? 's' : ''} a week.` : 'No workout days yet.'} Each finished workout day is +50 XP and +10 credits; a missed one is −50. A week counts toward your streak only if every workout day in it is done.
+        {scheduledCount ? `${scheduledCount} workout day${scheduledCount > 1 ? 's' : ''} a week.` : 'No workout days yet.'} Each finished workout day is +50 XP and +10 credits; a missed one is −50. Changes to today's plan apply from next week, not today. A week counts toward your streak only if every workout day in it is done.
       </p>
+      <div className="mb-4">
+        <PauseControl what="the dungeon" pause={g.pause} pausedToday={g.pausedToday} today={g.today} busy={action.isPending}
+          onSave={(from, to) => action.mutate({ method: 'PUT', path: '/pause', body: { from, to } }, { onSuccess: () => toast('Dungeon pause set', 'good'), onError: (e) => toast(e.message, 'bad') })}
+          onEnd={() => action.mutate({ method: 'DELETE', path: '/pause' }, { onError: (e) => toast(e.message, 'bad') })} />
+      </div>
       <div className="space-y-3">
-        {g.plan.map((d) => <DayCard key={d.weekday} d={d} onAdd={() => setAdding(d.weekday)} />)}
+        {g.plan.map((d) => <DayCard key={d.weekday} d={d} onAdd={() => setAdding(d.weekday)}
+          frozen={g.planChangedToday && d.weekday === new Date(`${g.today}T12:00:00`).getDay()} />)}
       </div>
       <Sheet open={adding !== null} onClose={() => setAdding(null)} title={adding !== null ? `Add to ${WEEKDAY_NAMES[adding]}` : ''}>
         {adding !== null && (
@@ -37,7 +44,7 @@ export function Plan() {
   );
 }
 
-function DayCard({ d, onAdd }: { d: PlanDay; onAdd: () => void }) {
+function DayCard({ d, onAdd, frozen }: { d: PlanDay; onAdd: () => void; frozen: boolean }) {
   const action = useGateAction();
   const [name, setName] = useState(d.name);
   const saveDay = (patch: Partial<{ name: string; isRest: boolean }>) =>
@@ -59,6 +66,7 @@ function DayCard({ d, onAdd }: { d: PlanDay; onAdd: () => void }) {
           <Moon size={12} /> Rest
         </button>
       </div>
+      {frozen && <p className="mt-2 text-xs text-muted">Changed today: today stays as it was, the new plan starts next week.</p>}
 
       {d.items.length > 0 && (
         <ul className={`mt-3 space-y-2 ${d.isRest ? 'opacity-50' : ''}`}>

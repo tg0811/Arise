@@ -320,6 +320,8 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX runs_date ON runs(date);
   `,
+  // 16: pauses (travel etc.): JSON [{ from, to|null }]; paused days aren't due and don't break streaks.
+  `ALTER TABLE tasks ADD COLUMN pauses TEXT NOT NULL DEFAULT '[]';`,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

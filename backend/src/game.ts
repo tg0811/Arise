@@ -4,7 +4,7 @@ import { getSetting, setSetting, tx } from './db.ts';
 import { settleWorkoutDay, todayWorkout, workoutDayStats } from './workout.ts';
 import {
   BOSS_MULTIPLIER, DAY_CLEAR_RATIO, DIFFICULTY_XP, MAX_LEVEL,
-  addDays, attributeLevel, creditsFor, isScheduled, levelFromXp, localDate, moodFor,
+  addDays, attributeLevel, creditsFor, currentPause, isScheduled, parsePauses, pausedOn, levelFromXp, localDate, moodFor,
   FREE_REMOVE_MINUTES, nextRank, rankForLevel, streakMultiplier, weekStart, weeklyBossXp,
   type Difficulty,
 } from '../../shared/engine.ts';
@@ -73,6 +73,8 @@ export interface Task {
   category_ids: string;
   /** A date this habit is due even if `days` no longer includes it (its days changed that day). */
   kept_date: string | null;
+  /** JSON Pause[]: days off the schedule (see planPause in the engine). */
+  pauses: string;
   /** A raised difficulty waiting to start, and the day it starts (raises apply from tomorrow). */
   next_difficulty: Difficulty | null;
   next_difficulty_from: string | null;
@@ -165,8 +167,8 @@ export function totalXp(db: DB): number {
  * Is the habit due on `date`? Only from its start day; then its weekdays, plus the day its weekdays were
  * changed (changes apply from tomorrow).
  */
-export const habitDue = (h: Pick<Task, 'days' | 'kept_date' | 'created_date'>, date: string) =>
-  date >= h.created_date && (isScheduled(h.days, date) || h.kept_date === date);
+export const habitDue = (h: Pick<Task, 'days' | 'kept_date' | 'created_date' | 'pauses'>, date: string) =>
+  date >= h.created_date && (isScheduled(h.days, date) || h.kept_date === date) && !pausedOn(parsePauses(h.pauses), date);
 
 /** A habit's difficulty on `date`: a raise counts from its start day, never for a day already under way. */
 export const difficultyOn = (h: Pick<Task, 'difficulty' | 'next_difficulty' | 'next_difficulty_from'>, date: string): Difficulty =>
@@ -547,6 +549,7 @@ export function buildState(ctx: Ctx) {
       ...maskTask(ctx, h),
       days: h.days, deadlineTime: h.deadline_time, reminderTime: h.reminder_time, scheduledToday: habitDue(h, todayStr),
       startsOn: h.created_date, freeEditUntil: freeRemoveUntil(h.created_at),
+      pause: currentPause(parsePauses(h.pauses), todayStr), pausedToday: pausedOn(parsePauses(h.pauses), todayStr),
       log: log ? { status: log.status, xp: log.xp } : null,
       streak, multiplier: nextMultiplier,
       xpGain: Math.round(DIFFICULTY_XP[difficultyOn(h, todayStr)] * nextMultiplier), xpLoss: DIFFICULTY_XP[difficultyOn(h, todayStr)],

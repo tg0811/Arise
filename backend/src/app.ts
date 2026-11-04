@@ -11,7 +11,7 @@ import {
   HttpError, completeHabit, completeQuest, createQuest, deleteQuest, failHabit, failQuest,
   archiveHabit, getProfile, getTask, habitDue, isFresh, logWeight, settle, today, undoHabit, undoQuest, type Ctx,
 } from './game.ts';
-import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, addDays, isScheduled, localDate, type Difficulty } from '../../shared/engine.ts';
+import { DIFFICULTIES, EXERCISE_KINDS, FOCUS_MAX_MIN, GOAL_TYPES, USERNAME_RE, addDays, endPause, isScheduled, localDate, parsePauses, planPause, type Difficulty } from '../../shared/engine.ts';
 import { fullState } from './state.ts';
 import {
   authenticationOptions, deletePasskey, isUnlocked, lockEnabled, lockNow, registerPasskey, registrationOptions,
@@ -28,11 +28,13 @@ import { exportData, resetData, restoreData } from './backup.ts';
 import {
   addExerciseToSession, addPlanItem, addSet, archiveExercise, createExercise, discardSession, finishSession, gateState,
   removePlanItem, removeSet, reorderPlanItems, startSession as startWorkout, undoFinish, updateDay, updateExercise, updatePlanItem, updateSet,
+  pauseDungeon, resumeDungeon,
 } from './workout.ts';
 import { logRun, removeRun, runsState } from './runs.ts';
 
 const difficulty = z.enum(DIFFICULTIES as [string, ...string[]]);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const id = (v: string) => {
   const n = Number(v);
   if (!Number.isInteger(n) || n <= 0) throw new HttpError(400, 'Bad id');
@@ -417,6 +419,30 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     return c.json(fullState(cx));
   });
 
+  // Pause a habit for a date range (travel): see planPause in the engine for the rules.
+  const PauseBody = z.object({ from: ymd, to: ymd });
+  const pausable = (c: any) => {
+    const h = getTask(db, id(c.req.param('id')));
+    if (h.kind !== 'habit' || h.archived) throw new HttpError(404, 'Habit not found');
+    if (h.private && !ctx(c).reveal) throw new HttpError(403, 'Unlock private items first');
+    return h;
+  };
+  app.put('/api/habits/:id/pause', async (c) => {
+    const b = PauseBody.parse(await c.req.json());
+    const h = pausable(c);
+    const out = planPause(parsePauses(h.pauses), b.from, b.to, today(ctx(c)));
+    if (typeof out === 'string') throw new HttpError(400, out);
+    db.prepare('UPDATE tasks SET pauses = ? WHERE id = ?').run(JSON.stringify(out), h.id);
+    return c.json(state(c));
+  });
+  app.delete('/api/habits/:id/pause', (c) => {
+    const h = pausable(c);
+    const out = endPause(parsePauses(h.pauses), today(ctx(c)));
+    if (typeof out === 'string') throw new HttpError(400, out);
+    db.prepare('UPDATE tasks SET pauses = ? WHERE id = ?').run(JSON.stringify(out), h.id);
+    return c.json(state(c));
+  });
+
   app.post('/api/habits/reorder', async (c) => {
     const { ids } = z.object({ ids: z.array(z.number().int()) }).parse(await c.req.json());
     tx(db, () => ids.forEach((tid, i) => db.prepare("UPDATE tasks SET sort = ? WHERE id = ? AND kind = 'habit'").run(i, tid)));
@@ -656,6 +682,11 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const { note } = z.object({ note: z.string().max(1000).default('') }).parse(await c.req.json().catch(() => ({})));
     return c.json(gate(c, (cx) => finishSession(cx, note)));
   });
+  app.put('/api/gate/pause', async (c) => {
+    const b = z.object({ from: ymd, to: ymd }).parse(await c.req.json());
+    return c.json(gate(c, (cx) => pauseDungeon(cx, b.from, b.to)));
+  });
+  app.delete('/api/gate/pause', (c) => c.json(gate(c, (cx) => resumeDungeon(cx))));
   app.post('/api/gate/runs', async (c) => {
     const b = RunBody.parse(await c.req.json());
     let rid = 0;

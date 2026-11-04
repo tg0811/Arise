@@ -231,6 +231,63 @@ export const EXERCISE_KINDS: ExerciseKind[] = ['strength', 'bodyweight', 'cardio
 /** Estimated one-rep max (Epley). */
 export const e1rm = (kg: number, reps: number) => (kg > 0 && reps > 0 ? Math.round(kg * (1 + reps / 30) * 10) / 10 : 0);
 
+// ---------------------------------------------------------------- pauses (travel, illness: days you physically can't)
+
+/**
+ * A pause takes a habit (or the Instant Dungeon) off the schedule for a date range: nothing is due, no XP moves,
+ * and streaks skip those days instead of breaking. `to` is inclusive. At most PAUSE_MAX_DAYS long (no open-ended pauses:
+ * an endless pause would keep a streak alive forever).
+ * Rules, so a pause can't be a way out of a day you just don't feel like:
+ *  - it starts tomorrow at the earliest (today always counts);
+ *  - one at a time: a running pause can be ended early, never extended;
+ *  - after one ends, the next can start PAUSE_COOLDOWN_DAYS later at the earliest.
+ * A pause that hasn't started yet can be changed or cancelled freely.
+ */
+export interface Pause { from: string; to: string | null }
+export const PAUSE_COOLDOWN_DAYS = 21;
+export const PAUSE_MAX_DAYS = 14;
+export const PAUSE_MAX_AHEAD_DAYS = 366;
+
+export function parsePauses(json: string | null | undefined): Pause[] {
+  let v: unknown;
+  try { v = JSON.parse(json || '[]'); } catch { return []; }
+  // Older open-ended pauses are capped like new ones.
+  return Array.isArray(v) ? v.map((p: Pause) => ({ from: p.from, to: p.to ?? addDays(p.from, PAUSE_MAX_DAYS - 1) })) : [];
+}
+
+export const pausedOn = (pauses: Pause[], date: string) => pauses.some((p) => p.from <= date && (p.to === null || date <= p.to));
+
+/** The running or upcoming pause, if any (what the app shows). */
+export const currentPause = (pauses: Pause[], today: string): Pause | null =>
+  pauses.find((p) => p.to === null || p.to >= today) ?? null;
+
+/** Schedule (or replace an upcoming) pause. Returns the new list, or an error message. */
+export function planPause(pauses: Pause[], from: string, to: string | null, today: string): Pause[] | string {
+  const tomorrow = addDays(today, 1);
+  if (from < tomorrow) return 'A pause starts tomorrow at the earliest: today still counts';
+  if (from > addDays(today, PAUSE_MAX_AHEAD_DAYS)) return 'Pick a start within a year';
+  if (to === null) return 'Pick the last day of the pause';
+  if (to < from) return 'The pause has to end on or after its first day';
+  if (to > addDays(from, PAUSE_MAX_DAYS - 1)) return `A pause can be at most ${PAUSE_MAX_DAYS} days`;
+  const cur = currentPause(pauses, today);
+  if (cur && cur.from <= today) return 'Already paused: resume first';
+  const past = pauses.filter((p) => p !== cur); // an upcoming pause is replaced
+  const lastEnd = past.map((p) => p.to!).sort().at(-1);
+  if (lastEnd && from < addDays(lastEnd, PAUSE_COOLDOWN_DAYS + 1)) {
+    return `Too soon after the last pause: the next can start from ${addDays(lastEnd, PAUSE_COOLDOWN_DAYS + 1)}`;
+  }
+  return [...past, { from, to }];
+}
+
+/** Cancel an upcoming pause, or end a running one so it's due again from today. */
+export function endPause(pauses: Pause[], today: string): Pause[] | string {
+  const cur = currentPause(pauses, today);
+  if (!cur) return 'Nothing is paused';
+  const rest = pauses.filter((p) => p !== cur);
+  if (cur.from > today) return rest; // not started: cancelled, as if it never was
+  return [...rest, { from: cur.from, to: addDays(today, -1) }];
+}
+
 // ---------------------------------------------------------------- runs
 
 /** A recorded run gives Body XP (harder than a workout). Only the first qualifying run of a day pays. */

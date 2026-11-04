@@ -10,6 +10,7 @@ import { CategoryIcon, useToast } from './ui';
 import { sfx } from '../lib/sound';
 import { Countdown } from './Countdown';
 import { Button } from './ui';
+import { PauseControl } from './PauseControl';
 import { daysLabel, formatDate, formatDateTime, formatDay } from '../lib/time';
 
 /** One chip per category, in the order they were picked. */
@@ -289,7 +290,7 @@ export function TaskDetail({ s, task, onEdit }: { s: AppState; task: { kind: 'ha
             <Fact label="Streak"><span className="inline-flex items-center gap-1"><Flame size={13} className="text-gold" />{task.h.streak} day{task.h.streak === 1 ? '' : 's'}</span>{task.h.multiplier > 1 && <span className="ml-1.5 text-accent2">×{task.h.multiplier}</span>}</Fact>
             <Fact label="XP"><span className="text-good">+{task.h.xpGain}</span> / <span className="text-bad">−{task.h.xpLoss}</span></Fact>
             {task.h.nextDifficulty && <Fact label="Raised">{DIFFICULTY_STYLE[task.h.nextDifficulty.difficulty].label} from {formatDay(task.h.nextDifficulty.from)}</Fact>}
-            <Fact label="Today">{task.h.startsOn > s.today ? 'Not started yet' : !task.h.scheduledToday ? 'Rest day' : task.h.log ? (task.h.log.status === 'done' ? <span className="text-good">Done</span> : <span className="text-bad">Failed</span>) : 'Not done yet'}</Fact>
+            <Fact label="Today">{task.h.startsOn > s.today ? 'Not started yet' : task.h.pausedToday ? 'Paused' : !task.h.scheduledToday ? 'Rest day' : task.h.log ? (task.h.log.status === 'done' ? <span className="text-good">Done</span> : <span className="text-bad">Failed</span>) : 'Not done yet'}</Fact>
           </>
         ) : (
           <>
@@ -305,6 +306,19 @@ export function TaskDetail({ s, task, onEdit }: { s: AppState; task: { kind: 'ha
       {(task.kind === 'habit' || task.q.status === 'pending') && (
         <Button className="mt-5 w-full" onClick={onEdit}><Pencil size={15} /> Edit</Button>
       )}
+      {task.kind === 'habit' && !task.h.masked && <HabitPause s={s} h={task.h} />}
+    </div>
+  );
+}
+
+function HabitPause({ s, h }: { s: AppState; h: Habit }) {
+  const action = useAction();
+  const toast = useToast();
+  return (
+    <div className="mt-3">
+      <PauseControl what="this habit" pause={h.pause} pausedToday={h.pausedToday} today={s.today} busy={action.isPending}
+        onSave={(from, to) => action.mutate({ method: 'PUT', path: `/habits/${h.id}/pause`, body: { from, to } }, { onSuccess: () => toast('Pause set', 'good'), onError: (e) => toast(e.message, 'bad') })}
+        onEnd={() => action.mutate({ method: 'DELETE', path: `/habits/${h.id}/pause` }, { onError: (e) => toast(e.message, 'bad') })} />
     </div>
   );
 }

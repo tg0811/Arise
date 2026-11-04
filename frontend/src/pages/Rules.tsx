@@ -6,7 +6,7 @@ import {
   MAX_LEVEL, MOOD_TIERS, RANKS, STREAK_TIERS, WEEKLY_BOSS_SHARE, attributeLevel, creditsFor, rankForLevel,
   totalXpForLevel, weeklyBossXp, xpToNext,
   GOAL_LATE_SHARE, GOAL_SIZES, JOURNAL_AAR_XP, LOOT_GEM_STREAK_STEP, LOOT_ODDS, LOOT_STREAK_BONUS_CAP, LOOT_STREAK_BONUS_PER_DAY, lootStreakBonus,
-  GATE_TITLE_WEEKS, RUN_MIN_KM, RUN_XP, WORKOUT_XP,
+  GATE_TITLE_WEEKS, PAUSE_COOLDOWN_DAYS, PAUSE_MAX_DAYS, RUN_MIN_KM, RUN_XP, WORKOUT_XP,
 } from '@shared';
 import type { AppState } from '../lib/api';
 import { DIFFICULTY_STYLE, rankColor } from '../lib/theme';
@@ -85,6 +85,7 @@ export function Rules({ s }: { s: AppState }) {
         <Rule><b className="text-ink">Stakes are set once.</b> A quest's difficulty and type and a goal's XP can't be changed after you create them, and a habit's difficulty can only be <b className="text-ink">raised, starting the next day</b>. Nothing can be lowered before a fail, or raised just for a day you know you'll win.</Rule>
         <Rule><b className="text-ink">No escape hatches.</b> Deadlines of quests and goals can only move earlier. Changing a habit's weekdays applies from tomorrow, and deleting a habit that's still due today counts as today's fail.</Rule>
         <Rule><b className="text-ink">Mistakes are free to fix in the first {FREE_REMOVE_MINUTES} minutes.</b> A new habit can be deleted, or its difficulty and days changed, without penalty in its first hour. A habit added at night can <b className="text-ink">start tomorrow</b>, so it's never due on a day it can't be done.</Rule>
+        <Rule><b className="text-ink">Pausing</b> (travel, illness: days you physically can't): open a habit and pause it for a date range. Paused days aren't due, cost nothing, and its streak skips them instead of breaking. A pause lasts at most {PAUSE_MAX_DAYS} days, starts tomorrow at the earliest, can be ended early but never extended, and the next one can start {PAUSE_COOLDOWN_DAYS} days after the last ends. The Instant Dungeon has the same pause in its Plan tab.</Rule>
         <Rule>Credits are earned on completion only (XP ÷ 5) and are never taken away. Spend them in the Store.</Rule>
       </ul>
 
@@ -233,7 +234,7 @@ export function Rules({ s }: { s: AppState }) {
         <ul className="space-y-2">
           <Rule>Plan your week in the Instant Dungeon: each weekday is a workout day (with exercises) or a rest day.</Rule>
           <Rule>Finishing a planned workout gives <b className="text-good">+{WORKOUT_XP} XP</b>, counting toward your level like any task, and it trains <b className="text-ink">Body</b> (plus credits). A planned workout not finished by midnight costs <b className="text-bad">−{WORKOUT_XP}</b>. Rest days are neutral.</Rule>
-          <Rule>Workout days count toward the daily {clear} clear, just like a task. Extra sessions on rest days are logged (PRs, history) but give no XP.</Rule>
+          <Rule>Workout days count toward the daily {clear} clear, just like a task. An extra session on a rest day pays the same <b className="text-good">+{WORKOUT_XP} XP</b> (one session a day at most), and skipping it costs nothing. Changing the plan for today (Rest, adding or removing exercises) applies from next week: today keeps the plan it started with.</Rule>
           <Rule><b className="text-ink">Weekly streak:</b> a week counts only if every planned workout in it was done. This week never breaks the streak until a workout is actually missed.</Rule>
           <Rule><b className="text-ink">Runs:</b> record the distance (km or miles) and time; the pace is worked out for you. The first run of the day of at least {RUN_MIN_KM} km gives <b className="text-good">+{RUN_XP} XP</b> to <b className="text-ink">Body</b> (plus credits). More runs that day are kept in your history without XP. Runs are logged for today only, and can be removed the same day if you made a typo. Missing a run costs nothing.</Rule>
           <Rule>Records: heaviest weight, most reps, estimated 1RM (weight × (1 + reps ÷ 30)), longest distance and time.</Rule>

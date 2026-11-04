@@ -129,6 +129,25 @@ test('habit order can be changed; a habit can have a reminder time', async () =>
   await expect(card.getByTitle('Reminder')).toHaveText('07:00');
 });
 
+test('habit pause: set from a habit\'s details (starts tomorrow), then cancel', async () => {
+  await page.getByRole('button', { name: 'Read 30 pages' }).first().click();
+  await sheet().getByRole('button', { name: /Pause for a while/ }).click();
+  const d = new Date(Date.now() + 3 * 86_400_000); // ends in 3 days (starts tomorrow by default)
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  await sheet().getByLabel('Until (incl.)').fill(iso);
+  await expect(sheet().getByText('3 days paused')).toBeVisible();
+  const far = new Date(Date.now() + 30 * 86_400_000); // past the cap: snaps to the 14th day, with a warning
+  await sheet().getByLabel('Until (incl.)').fill(`${far.getFullYear()}-${String(far.getMonth() + 1).padStart(2, '0')}-${String(far.getDate()).padStart(2, '0')}`);
+  await expect(sheet().getByText('14 days paused')).toBeVisible();
+  await expect(sheet().getByText('Maximum 14-day pause allowed')).toBeVisible();
+  await sheet().getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(page.getByText('Pause set')).toBeVisible();
+  await expect(sheet().getByText(/^Pauses .* → /)).toBeVisible();
+  await sheet().getByRole('button', { name: 'Cancel' }).click();
+  await expect(sheet().getByRole('button', { name: /Pause for a while/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
+});
+
 test('quest: the quest section Add opens on the Quest tab; clearing pays XP and credits', async () => {
   await page.getByText('No active quests').click();
   await expect(page.getByPlaceholder('Finish the API refactor')).toBeVisible();

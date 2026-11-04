@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Check, X, Plus, Trash2, Timer, Undo2, Swords, Moon, Trophy, CalendarDays } from 'lucide-react';
-import { e1rm } from '@shared';
+import { addDays, e1rm } from '@shared';
 import { useGate, useGateAction, type Gate, type GateExercise, type GateSession, type GateSet } from '../../lib/api';
 import { sfx } from '../../lib/sound';
 import { Button, Panel, Sheet, useToast } from '../../components/ui';
 import { ExercisePicker, KindIcon, WEEKDAY_NAMES, targetText } from './shared';
-import { weekdayName } from '../../lib/time';
+import { formatDay, weekdayName } from '../../lib/time';
 import { holdCelebrations } from '../../lib/celebrate';
 import { ClearSplash } from './effects';
 
@@ -33,6 +33,7 @@ const DAY_STYLE: Record<Gate['week'][number]['status'], { mark: string; cls: str
   active: { mark: '…', cls: 'bg-accent/20 text-accent border-accent/50', label: 'In progress' },
   planned: { mark: '•', cls: 'text-ink2 border-line', label: 'Planned' },
   rest: { mark: '–', cls: 'text-muted border-transparent', label: 'Rest' },
+  paused: { mark: 'Ⅱ', cls: 'text-muted border-dashed border-line', label: 'Paused' },
 };
 
 function WeekStrip({ g }: { g: Gate }) {
@@ -72,6 +73,19 @@ function TodayPlan({ g }: { g: Gate }) {
     );
   }
 
+  if (g.pausedToday) {
+    return (
+      <Panel className="p-6 text-center">
+        <Moon size={30} className="mx-auto text-accent2" />
+        <h2 className="mt-3 font-display text-xl font-bold tracking-wider">Dungeon paused</h2>
+        <p className="mt-1 text-sm text-ink2">{g.pause?.to ? `Back on ${formatDay(addDays(g.pause.to, 1))}.` : ''} Nothing is due, no XP is lost, and the weekly streak waits.</p>
+        <button onClick={start} disabled={action.isPending} className="mt-4 text-xs font-bold text-muted underline-offset-4 hover:text-ink2 hover:underline">
+          Log an extra session (+50 XP, nothing lost if you skip)
+        </button>
+      </Panel>
+    );
+  }
+
   if (!p.scheduled) {
     const next = [1, 2, 3, 4, 5, 6, 7].map((i) => g.plan.find((d) => d.weekday === (p.weekday + i) % 7)!).find((d) => d.scheduled);
     return (
@@ -80,7 +94,7 @@ function TodayPlan({ g }: { g: Gate }) {
         <h2 className="mt-3 font-display text-xl font-bold tracking-wider">Rest day</h2>
         <p className="mt-1 text-sm text-ink2">Recovery is training. See you {next ? `on ${WEEKDAY_NAMES[next.weekday]}${next.name ? ` for ${next.name}` : ''}` : 'soon'}.</p>
         <button onClick={start} disabled={action.isPending} className="mt-4 text-xs font-bold text-muted underline-offset-4 hover:text-ink2 hover:underline">
-          Log an extra session anyway (no XP)
+          Log an extra session (+50 XP, nothing lost if you skip)
         </button>
       </Panel>
     );
@@ -153,7 +167,7 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
       {cleared && (
         <ClearSplash kicker={cleared.scheduled ? 'Dungeon cleared' : 'Extra session logged'} title={cleared.title.toUpperCase()}
           detail={`${cleared.sets} set${cleared.sets === 1 ? '' : 's'} · ${cleared.minutes}`}
-          rewards={cleared.scheduled ? ['+50 XP', '+10 credits'] : undefined} onClose={closeSplash} />
+          rewards={['+50 XP', '+10 credits']} onClose={closeSplash} />
       )}
     </AnimatePresence>
   );
@@ -165,7 +179,7 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
       <Panel className="p-6 text-center">
         <Trophy size={32} className="mx-auto text-accent2" />
         <h2 className="mt-3 font-display text-xl font-bold tracking-wider">{session.title} cleared</h2>
-        <p className="mt-1 text-sm text-ink2">{doneSets} sets{session.scheduled ? ' · +50 XP · +10 credits' : ' · extra session'}</p>
+        <p className="mt-1 text-sm text-ink2">{doneSets} sets · +50 XP · +10 credits{session.scheduled ? '' : ' · extra session'}</p>
         <button onClick={() => action.mutate({ path: '/session/undo' })} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink2">
           <Undo2 size={13} /> Reopen (mis-tap)
         </button>

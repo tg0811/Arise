@@ -12,7 +12,7 @@ const TABLES = [
 ] as const;
 
 /** Settings that are game data (not credentials) and travel with a backup. */
-const DATA_SETTINGS = ['last_settled_date', 'reminders', 'last_reminder_at', 'workout_schedule_since'];
+const DATA_SETTINGS = ['last_settled_date', 'reminders', 'last_reminder_at', 'workout_schedule_since', 'workout_pauses', 'workout_kept_today'];
 
 export const RESET_PHRASE = 'I ACCEPT THE RESET';
 

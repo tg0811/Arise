@@ -4,6 +4,7 @@ import { DIFFICULTIES, DIFFICULTY_XP, BOSS_MULTIPLIER, addDays as addDayStr, typ
 import { useAction, type AppState, type Habit, type Quest } from '../lib/api';
 import { DIFFICULTY_STYLE } from '../lib/theme';
 import { formatDate, formatDateTime, formatDay, toLocalInput } from '../lib/time';
+import { openPicker } from './PauseControl';
 import { Button, CategoryIcon, useToast } from './ui';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -226,7 +227,7 @@ export function TaskForm({ s, mode, onDone }: { s: AppState; mode: Mode; onDone:
                 <label className={`relative flex items-center justify-center gap-1.5 rounded-xl border text-xs font-bold transition ${startsOn > tomorrow ? 'border-accent bg-accent/20 text-ink' : 'border-line text-ink2'}`}>
                   <CalendarDays size={14} /> {startsOn > tomorrow ? formatDate(startsOn) : 'Pick date'}
                   <input type="date" aria-label="Start date" value={startsOn} min={s.today} max={addDayStr(s.today, 366)}
-                    onChange={(e) => e.target.value && setStartsOn(e.target.value)}
+                    onChange={(e) => e.target.value && setStartsOn(e.target.value)} onClick={openPicker}
                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                 </label>
               </div>

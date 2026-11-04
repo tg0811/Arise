@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Moon, Target, ChevronRight, Timer, Orbit, ArrowUpDown, ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { Plus, Moon, Pause, Target, ChevronRight, Timer, Orbit, ArrowUpDown, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import { FocusForm } from '../components/Focus';
 import { PrivateUnlockedBar } from '../components/Private';
 import { LootboxButton } from '../components/Lootbox';
@@ -21,7 +21,8 @@ export function Today({ s }: { s: AppState }) {
   const [focusOpen, setFocusOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
   const todayHabits = s.habits.filter((h) => h.scheduledToday);
-  const restHabits = s.habits.filter((h) => !h.scheduledToday);
+  const restHabits = s.habits.filter((h) => !h.scheduledToday && !h.pausedToday);
+  const pausedHabits = s.habits.filter((h) => h.pausedToday);
   // Unresolved first, then done, then failed.
   const order = (h: Habit) => (h.log === null ? 0 : h.log.status === 'done' ? 1 : 2);
   const sortedHabits = [...todayHabits].sort((a, b) => order(a) - order(b));
@@ -133,6 +134,21 @@ export function Today({ s }: { s: AppState }) {
               <button key={h.id} onClick={() => setEditing({ kind: 'habit', id: h.id, edit: false })}
                 className="glass inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm text-ink2">
                 <Moon size={13} /> {h.title} <span className="text-xs text-muted">· {h.startsOn > s.today ? `starts ${formatDate(h.startsOn)}` : daysLabel(h.days)}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {pausedHabits.length > 0 && (
+        <>
+          <SectionTitle>Paused</SectionTitle>
+          <p className="-mt-1 mb-2 text-xs text-muted">Off the schedule for now: nothing due, no XP lost, streaks wait.</p>
+          <div className="flex flex-wrap gap-2">
+            {pausedHabits.map((h) => (
+              <button key={h.id} onClick={() => setEditing({ kind: 'habit', id: h.id, edit: false })}
+                className="glass inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm text-ink2 opacity-75">
+                <Pause size={13} /> {h.title} <span className="text-xs text-muted">· until {h.pause ? formatDate(h.pause.to!) : ''}</span>
               </button>
             ))}
           </div>

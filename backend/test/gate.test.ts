@@ -59,7 +59,7 @@ test('session: pre-filled sets, finish needs a ticked set, +50 Body XP, undo, Ga
   assert.equal(r.gate.session.status, 'active');
 });
 
-test('next week pre-fills from last time; extra sessions on rest days give no XP', async () => {
+test('next week pre-fills from last time; an extra session on a rest day pays the same XP', async () => {
   const { h } = await withPlan();
   let r = await h.call('POST', '/api/gate/session/start');
   for (const st of r.gate.session.exercises[0].sets) r = await h.call('PUT', `/api/gate/sets/${st.id}`, { reps: 6, kg: 65, done: true });
@@ -74,7 +74,8 @@ test('next week pre-fills from last time; extra sessions on rest days give no XP
   assert.deepEqual([set.reps, set.kg], [6, 65], 'pre-filled from last time');
   await h.call('PUT', `/api/gate/sets/${set.id}`, { reps: 6, kg: 65, done: true });
   r = await h.call('POST', '/api/gate/session/finish', {});
-  assert.equal(r.state.progress.totalXp, 50, 'extra session gave nothing');
+  assert.equal(r.state.progress.totalXp, 100, 'extra session paid +50 too');
+  assert.equal(r.state.wallet.credits, 20);
   h.advance(24 * 6); // next Monday
   r = await h.call('POST', '/api/gate/session/start');
   assert.deepEqual(r.gate.session.exercises[0].sets.map((x: any) => [x.reps, x.kg]), [[6, 65], [6, 65], [6, 65]]);
@@ -162,4 +163,28 @@ test('re-creating a removed exercise by name brings it back instead of a duplica
   assert.equal(ex.length, 1);
   assert.equal(ex[0].archived, false);
   assert.equal(ex[0].muscle, 'Upper chest');
+});
+
+test('changing today\'s plan applies from next week: Rest at night can\'t dodge today, and it can\'t make today due', async () => {
+  const { h, bench } = await withPlan(); // Monday "Push", plan saved today
+  h.advance(24 * 7); // next Monday: the plan is a week old now
+  let r = await h.call('PUT', '/api/gate/days/1', { name: 'Push', isRest: true });
+  assert.equal(r.gate.todayPlan.scheduled, true, 'today keeps its workout');
+  assert.equal(r.gate.planChangedToday, true);
+  h.advance(24); // Tuesday: the frozen Monday was still due and is missed
+  r = await h.call('GET', '/api/gate');
+  assert.ok(r.gate.history.some((x: any) => x.date === '2026-11-09' && x.status === 'missed'), 'Rest marked on the day did not dodge it');
+  // Tuesday is a rest day: adding exercises today does not make today due
+  r = await h.call('POST', '/api/gate/days/2/items', { exerciseId: bench, targetSets: 3 });
+  assert.equal(r.gate.todayPlan.scheduled, false);
+  h.advance(24); // Wednesday
+  r = await h.call('GET', '/api/gate');
+  assert.ok(!r.gate.history.some((x: any) => x.date === '2026-11-10'), 'nothing charged for the Tuesday it was added');
+});
+
+test('the day you first build your plan, changes apply at once', async () => {
+  const { h, r } = await withPlan();
+  assert.equal(r.gate.todayPlan.scheduled, true);
+  const after = await h.call('PUT', '/api/gate/days/1', { name: 'Push', isRest: true });
+  assert.equal(after.gate.todayPlan.scheduled, false);
 });

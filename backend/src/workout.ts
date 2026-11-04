@@ -1,9 +1,10 @@
 import { getSetting, seedWorkoutDays, setSetting, tx, type DB } from './db.ts';
 import { HttpError, addCurrency, addXp, getProfile, removeEvents, today, type Ctx } from './game.ts';
-import { WORKOUT_XP, addDays, creditsFor, e1rm, weekStart, weekday, type ExerciseKind } from '../../shared/engine.ts';
+import { WORKOUT_XP, addDays, creditsFor, currentPause, e1rm, endPause, parsePauses, pausedOn, planPause, weekStart, weekday, type ExerciseKind } from '../../shared/engine.ts';
 
 // The Instant Dungeon (internally "gate"): a Mon–Sun workout plan, logged sessions (sets × reps × kg), PRs and a weekly streak.
-// Scheduled workout days move Body XP like a Hard habit (gain = loss); extra sessions are log-only.
+// Scheduled workout days move Body XP like a Hard habit (gain = loss). An extra session (rest day) pays the same XP but
+// costs nothing if skipped; there's at most one session a day, so it can't be farmed.
 
 const SINCE_KEY = 'workout_schedule_since';
 
@@ -25,8 +26,51 @@ const items = (db: DB, wd?: number) =>
     ? db.prepare('SELECT * FROM workout_plan_items ORDER BY weekday, sort, id').all()
     : db.prepare('SELECT * FROM workout_plan_items WHERE weekday = ? ORDER BY sort, id').all(wd)) as unknown as ItemRow[];
 
-/** A weekday is a workout day when it's not marked rest and has at least one exercise planned. */
-export function plannedDay(db: DB, date: string): { name: string; items: ItemRow[] } | null {
+// ---------------------------------------------------------------- pause (same rules as a habit pause)
+
+const PAUSE_KEY = 'workout_pauses';
+const dungeonPauses = (db: DB) => parsePauses(getSetting(db, PAUSE_KEY));
+
+export function pauseDungeon(ctx: Ctx, from: string, to: string | null) {
+  const out = planPause(dungeonPauses(ctx.db), from, to, today(ctx));
+  if (typeof out === 'string') throw new HttpError(400, out);
+  setSetting(ctx.db, PAUSE_KEY, JSON.stringify(out));
+}
+
+export function resumeDungeon(ctx: Ctx) {
+  const out = endPause(dungeonPauses(ctx.db), today(ctx));
+  if (typeof out === 'string') throw new HttpError(400, out);
+  setSetting(ctx.db, PAUSE_KEY, JSON.stringify(out));
+}
+
+// ---------------------------------------------------------------- today's plan is fixed once the day is under way
+
+// Changing the plan (rest toggle, adding or removing exercises) applies from tomorrow: the first change made to
+// today's weekday freezes today as it was. So marking today Rest at 23:00 can't dodge a workout, and adding exercises
+// at night can't make today due by surprise. Exception: the day you first build your plan, changes apply at once.
+const KEPT_KEY = 'workout_kept_today';
+type Planned = { name: string; items: ItemRow[] } | null;
+
+function keptToday(db: DB, date: string): { plan: Planned } | null {
+  const raw = getSetting(db, KEPT_KEY);
+  if (!raw) return null;
+  const k = JSON.parse(raw) as { date: string; plan: Planned };
+  return k.date === date ? { plan: k.plan } : null;
+}
+
+/** Call before a change that can affect weekday `wd`. */
+function keepToday(ctx: Ctx, wd: number) {
+  const date = today(ctx);
+  const since = scheduleSince(ctx.db);
+  if (weekday(date) !== wd || !since || since >= date || keptToday(ctx.db, date)) return;
+  setSetting(ctx.db, KEPT_KEY, JSON.stringify({ date, plan: plannedDay(ctx.db, date) }));
+}
+
+/** A weekday is a workout day when it's not marked rest and has at least one exercise planned (and the dungeon isn't paused). */
+export function plannedDay(db: DB, date: string): Planned {
+  if (pausedOn(dungeonPauses(db), date)) return null;
+  const kept = keptToday(db, date);
+  if (kept) return kept.plan;
   const wd = weekday(date);
   const day = days(db).find((d) => d.weekday === wd)!;
   if (day.is_rest) return null;
@@ -43,6 +87,7 @@ function touchPlan(ctx: Ctx) {
 
 export function updateDay(ctx: Ctx, wd: number, d: { name: string; isRest: boolean }) {
   days(ctx.db);
+  keepToday(ctx, wd);
   ctx.db.prepare('UPDATE workout_days SET name = ?, is_rest = ? WHERE weekday = ?').run(d.name, d.isRest ? 1 : 0, wd);
   touchPlan(ctx);
 }
@@ -51,6 +96,7 @@ export interface PlanItemInput { exerciseId: number; targetSets: number; targetR
 
 export function addPlanItem(ctx: Ctx, wd: number, i: PlanItemInput) {
   getExercise(ctx.db, i.exerciseId);
+  keepToday(ctx, wd);
   const { m } = ctx.db.prepare('SELECT COALESCE(MAX(sort), -1) AS m FROM workout_plan_items WHERE weekday = ?').get(wd) as { m: number };
   ctx.db.prepare('INSERT INTO workout_plan_items (weekday, exercise_id, sort, target_sets, target_reps, target_kg, target_min) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(wd, i.exerciseId, m + 1, i.targetSets, i.targetReps, i.targetKg, i.targetMin);
@@ -66,6 +112,8 @@ export function updatePlanItem(ctx: Ctx, id: number, i: Omit<PlanItemInput, 'exe
 }
 
 export function removePlanItem(ctx: Ctx, id: number) {
+  const it = ctx.db.prepare('SELECT weekday FROM workout_plan_items WHERE id = ?').get(id) as { weekday: number } | undefined;
+  if (it) keepToday(ctx, it.weekday);
   ctx.db.prepare('DELETE FROM workout_plan_items WHERE id = ?').run(id);
 }
 
@@ -101,6 +149,7 @@ export function updateExercise(ctx: Ctx, id: number, e: { name: string; kind: Ex
 export function archiveExercise(ctx: Ctx, id: number) {
   getExercise(ctx.db, id);
   tx(ctx.db, () => {
+    keepToday(ctx, weekday(today(ctx)));
     ctx.db.prepare('UPDATE exercises SET archived = 1 WHERE id = ?').run(id);
     ctx.db.prepare('DELETE FROM workout_plan_items WHERE exercise_id = ?').run(id);
   });
@@ -204,11 +253,10 @@ export function finishSession(ctx: Ctx, note = '') {
     const doneSets = (ctx.db.prepare('SELECT COUNT(*) AS n FROM workout_sets WHERE session_id = ? AND done = 1').get(s.id) as { n: number }).n;
     if (!doneSets) throw new HttpError(400, 'Tick at least one set before finishing');
     ctx.db.prepare("UPDATE workout_sessions SET status = 'done', finished_at = ?, note = ? WHERE id = ?").run(ctx.at.toISOString(), note, s.id);
-    if (s.scheduled) {
-      const label = `Workout: ${s.title}`;
-      addXp(ctx, s.date, WORKOUT_XP, bodyCategory(ctx.db), 'workout', s.id, label);
-      addCurrency(ctx, s.date, 'credits', creditsFor(WORKOUT_XP), 'workout', s.id, label);
-    }
+    // Planned or extra, an honest session pays the same (one session a day at most).
+    const label = `Workout: ${s.title}`;
+    addXp(ctx, s.date, WORKOUT_XP, bodyCategory(ctx.db), 'workout', s.id, label);
+    addCurrency(ctx, s.date, 'credits', creditsFor(WORKOUT_XP), 'workout', s.id, label);
   });
 }
 
@@ -356,11 +404,11 @@ export function gateState(ctx: Ctx) {
     const d = addDays(wk, i);
     const s = sessionFor(db, d);
     const planned = plannedDay(db, d);
-    let status: 'done' | 'missed' | 'planned' | 'rest' | 'active' | 'extra';
+    let status: 'done' | 'missed' | 'planned' | 'rest' | 'active' | 'extra' | 'paused';
     if (s?.status === 'done') status = s.scheduled ? 'done' : 'extra';
     else if (s?.status === 'missed') status = 'missed';
     else if (s?.status === 'active') status = 'active';
-    else status = planned ? 'planned' : 'rest';
+    else status = planned ? 'planned' : pausedOn(dungeonPauses(db), d) ? 'paused' : 'rest';
     return { date: d, name: planned?.name ?? '', status, isToday: d === date };
   });
 
@@ -419,14 +467,29 @@ export function gateState(ctx: Ctx) {
     };
   });
 
+  // Today as it counts: the frozen plan if today's weekday was changed today, else the plan.
+  const todayView = () => {
+    const tpl = plan.find((p) => p.weekday === weekday(date))!;
+    const kept = keptToday(db, date);
+    if (!kept) return tpl;
+    const its = (kept.plan?.items ?? []).map((i) => ({
+      id: i.id, exerciseId: i.exercise_id, name: exName.get(i.exercise_id)?.name ?? '?', kind: exName.get(i.exercise_id)?.kind ?? 'strength',
+      targetSets: i.target_sets, targetReps: i.target_reps, targetKg: i.target_kg, targetMin: i.target_min,
+    }));
+    return { ...tpl, name: kept.plan?.name ?? tpl.name, isRest: !kept.plan, scheduled: !!kept.plan, items: its };
+  };
+
   const streak = weekStreak(ctx);
   return {
     today: date,
     timezone: tz,
+    pause: currentPause(dungeonPauses(db), date),
+    pausedToday: pausedOn(dungeonPauses(db), date),
     scheduleSince: since,
     plan,
     week,
-    todayPlan: plan.find((p) => p.weekday === weekday(date))!,
+    todayPlan: todayView(),
+    planChangedToday: !!keptToday(db, date),
     session,
     history,
     exercises: library,
