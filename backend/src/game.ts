@@ -404,6 +404,8 @@ export function settle(ctx: Ctx) {
   const profile = getProfile(ctx.db);
   if (!profile.onboarded) return;
   tx(ctx.db, () => {
+    // To-dos ticked on an earlier day are gone (no history kept).
+    ctx.db.prepare('DELETE FROM todos WHERE done_date IS NOT NULL AND done_date < ?').run(today(ctx));
     const expired = ctx.db.prepare("SELECT * FROM tasks WHERE kind = 'quest' AND status = 'pending' AND deadline_at <= ?")
       .all(ctx.at.toISOString()) as unknown as Task[];
     for (const q of expired) failQuestInner(ctx, q, true);
@@ -598,6 +600,9 @@ export function buildState(ctx: Ctx) {
     categories,
     habits,
     quests,
+    // Plain to-dos: open ones first (oldest first), then today's ticked ones.
+    todos: (db.prepare('SELECT id, text, done_date FROM todos WHERE done_date IS NULL OR done_date >= ? ORDER BY done_date IS NOT NULL, id').all(todayStr) as { id: number; text: string; done_date: string | null }[])
+      .map((t) => ({ id: t.id, text: t.text, done: t.done_date !== null })),
     weeklyBossAvailable: weeklyBossAvailable(ctx),
     privateUntil: ctx.privateUntil ?? null,
   };

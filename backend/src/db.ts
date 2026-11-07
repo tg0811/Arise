@@ -322,6 +322,15 @@ const MIGRATIONS: string[] = [
   `,
   // 16: pauses (travel etc.): JSON [{ from, to|null }]; paused days aren't due and don't break streaks.
   `ALTER TABLE tasks ADD COLUMN pauses TEXT NOT NULL DEFAULT '[]';`,
+  `
+  -- 17: a plain to-do list (no XP, no history). Ticked items show until midnight, then they're deleted.
+  CREATE TABLE todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    done_date TEXT,
+    created_at TEXT NOT NULL
+  );
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

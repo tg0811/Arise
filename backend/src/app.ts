@@ -443,6 +443,24 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     return c.json(state(c));
   });
 
+  // ------------------------------------------------------------ to-dos: a plain list, no XP
+  const TodoText = z.object({ text: z.string().trim().min(1).max(200) });
+  app.post('/api/todos', async (c) => {
+    const { text } = TodoText.parse(await c.req.json());
+    db.prepare('INSERT INTO todos (text, created_at) VALUES (?, ?)').run(text, clock().toISOString());
+    return c.json(state(c));
+  });
+  app.put('/api/todos/:id', async (c) => {
+    const { done } = z.object({ done: z.boolean() }).parse(await c.req.json());
+    const res = db.prepare('UPDATE todos SET done_date = ? WHERE id = ?').run(done ? today(ctx(c)) : null, id(c.req.param('id')));
+    if (!res.changes) throw new HttpError(404, 'To-do not found');
+    return c.json(state(c));
+  });
+  app.delete('/api/todos/:id', (c) => {
+    db.prepare('DELETE FROM todos WHERE id = ?').run(id(c.req.param('id')));
+    return c.json(state(c));
+  });
+
   app.post('/api/habits/reorder', async (c) => {
     const { ids } = z.object({ ids: z.array(z.number().int()) }).parse(await c.req.json());
     tx(db, () => ids.forEach((tid, i) => db.prepare("UPDATE tasks SET sort = ? WHERE id = ? AND kind = 'habit'").run(i, tid)));

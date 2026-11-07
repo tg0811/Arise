@@ -51,6 +51,8 @@ export interface AppState {
     used: { id: number; name: string; icon: string; source: 'store' | 'lootbox'; usedAt: string }[];
   };
   lootbox: { available: boolean; claimed: Loot | null };
+  /** Plain to-dos (no XP). Ticked ones show until midnight, then vanish. */
+  todos: { id: number; text: string; done: boolean }[];
   journal: JournalEntry[];
   /** Only present on the response to opening the lootbox. */
   loot?: Loot;

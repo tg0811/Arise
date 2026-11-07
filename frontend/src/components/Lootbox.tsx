@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Gift, Lock, Coins, Gem, Sparkles, Package } from 'lucide-react';
 import { DAY_CLEAR_RATIO, lootStreakBonus } from '@shared';
@@ -63,7 +64,9 @@ export function LootboxButton({ s }: { s: AppState }) {
   return (
     <>
       {content}
-      <AnimatePresence>
+      {/* Portalled to <body>: the button lives inside a blurred (backdrop-filter) panel, which would otherwise
+          trap this fixed overlay inside the panel instead of covering the screen. */}
+      {createPortal(<AnimatePresence>
         {reveal && (
           <motion.div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/85 px-6 text-center backdrop-blur-md"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}>
@@ -85,7 +88,7 @@ export function LootboxButton({ s }: { s: AppState }) {
             <p className="absolute bottom-10 text-xs text-muted">Tap to continue</p>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
     </>
   );
 }

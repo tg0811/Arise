@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Undo2, Flame, Clock, Pencil, Skull, Crown, Link2, Trash2, Lock, LockOpen, CalendarDays, Bell } from 'lucide-react';
 import { UnlockSheet } from './Private';
@@ -42,15 +42,25 @@ function DifficultyChip({ d }: { d: string }) {
 function useTaskAction() {
   const action = useAction();
   const toast = useToast();
-  return (path: string, done?: string, tone: 'good' | 'bad' | 'info' = 'info', method = 'POST') =>
+  // The sound plays on the tap itself (not after the round trip), so the result feels instant.
+  return (path: string, done?: string, tone: 'good' | 'bad' | 'info' = 'info', method = 'POST', onError?: () => void) => {
+    if (tone === 'good') sfx.complete();
+    if (tone === 'bad') sfx.fail();
     action.mutate({ path, method }, {
-      onSuccess: () => {
-        if (tone === 'good') sfx.complete();
-        if (tone === 'bad') sfx.fail();
-        if (done) toast(done, tone);
-      },
-      onError: (e) => toast(e.message, 'bad'),
+      onSuccess: () => { if (done) toast(done, tone); },
+      onError: (e) => { onError?.(); toast(e.message, 'bad'); },
     });
+  };
+}
+
+/**
+ * Show a result the moment it's confirmed instead of waiting for the server (a phone on mobile data can take a
+ * noticeable moment). Cleared as soon as the server's state arrives; rolled back if the request fails.
+ */
+function useOptimistic<T>(serverValue: unknown) {
+  const [value, setValue] = useState<T | null>(null);
+  useEffect(() => setValue(null), [serverValue]);
+  return [value, setValue, () => setValue(null)] as const;
 }
 
 /** Card props shared by both kinds: tap the card for details, the pencil goes straight to editing. */
@@ -76,15 +86,17 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
   // Both outcomes take a second tap: no XP is won or lost by a stray touch.
   const [confirm, setConfirm] = useState<null | 'complete' | 'fail'>(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
-  const resolved = h.log !== null;
+  const [optimistic, setOptimistic, rollback] = useOptimistic<'done' | 'failed'>(h.log);
+  const log = h.log ?? (optimistic ? { status: optimistic, xp: optimistic === 'done' ? h.xpGain : -h.xpLoss } : null);
+  const resolved = log !== null;
   const late = !resolved && isLate(h.deadlineTime);
   const unlock = () => setUnlockOpen(true);
   return (
     <>
       <motion.div layout onClick={h.masked ? unlock : onOpen}
         className={`glass relative cursor-pointer overflow-hidden rounded-2xl p-4 transition hover:border-accent/60 ${resolved ? 'opacity-70' : ''}`}>
-        {h.log?.status === 'done' && <div className="absolute inset-y-0 left-0 w-1 bg-good" />}
-        {h.log?.status === 'failed' && <div className="absolute inset-y-0 left-0 w-1 bg-bad" />}
+        {log?.status === 'done' && <div className="absolute inset-y-0 left-0 w-1 bg-good" />}
+        {log?.status === 'failed' && <div className="absolute inset-y-0 left-0 w-1 bg-bad" />}
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -116,7 +128,7 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
                 </span>
               )}
               {resolved ? (
-                <span className={`font-black ${h.log!.xp >= 0 ? 'text-good' : 'text-bad'}`}>{h.log!.xp >= 0 ? '+' : ''}{h.log!.xp} XP</span>
+                <span className={`font-black ${log!.xp >= 0 ? 'text-good' : 'text-bad'}`}>{log!.xp >= 0 ? '+' : ''}{log!.xp} XP</span>
               ) : (
                 <span className="font-bold text-muted"><span className="text-good">+{h.xpGain}</span> / <span className="text-bad">−{h.xpLoss}</span></span>
               )}
@@ -127,18 +139,18 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
 
         <div className="mt-3 flex gap-2" onClick={stop}>
           {resolved ? (
-            <button onClick={() => run(`/habits/${h.id}/undo`, 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
+            <button disabled={!h.log} onClick={() => run(`/habits/${h.id}/undo`, 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
               <Undo2 size={13} /> Undo
             </button>
           ) : confirm === 'fail' ? (
             <>
-              <button onClick={() => { setConfirm(null); run(`/habits/${h.id}/fail`, `−${h.xpLoss} XP. Rise again tomorrow.`, 'bad'); }}
+              <button onClick={() => { setConfirm(null); setOptimistic('failed'); run(`/habits/${h.id}/fail`, `−${h.xpLoss} XP. Rise again tomorrow.`, 'bad', 'POST', rollback); }}
                 className="flex-1 rounded-xl border border-bad/50 bg-bad/15 py-2 text-sm font-bold text-bad">Confirm fail</button>
               <button onClick={() => setConfirm(null)} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink2">Cancel</button>
             </>
           ) : confirm === 'complete' ? (
             <>
-              <button onClick={() => { setConfirm(null); run(`/habits/${h.id}/complete`, `+${h.xpGain} XP`, 'good'); }}
+              <button onClick={() => { setConfirm(null); setOptimistic('done'); run(`/habits/${h.id}/complete`, `+${h.xpGain} XP`, 'good', 'POST', rollback); }}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/60 bg-good/20 py-2 text-sm font-bold text-good">
                 <Check size={16} /> Confirm complete (+{h.xpGain} XP)
               </button>
@@ -170,14 +182,16 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
   const [confirm, setConfirm] = useState<null | 'clear' | 'fail' | 'delete'>(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
   const unlock = () => setUnlockOpen(true);
-  const pending = q.status === 'pending';
+  const [optimistic, setOptimistic, rollback] = useOptimistic<'done' | 'failed'>(q.status);
+  const status = optimistic ?? q.status;
+  const pending = status === 'pending';
   const isBoss = q.boss !== 'none';
   return (
     <>
       <motion.div layout onClick={q.masked ? unlock : onOpen}
         className={`glass relative cursor-pointer overflow-hidden rounded-2xl p-4 transition hover:border-accent/60 ${!pending ? 'opacity-70' : ''} ${isBoss && pending ? 'border-accent/60 shadow-[0_0_24px_color-mix(in_srgb,var(--sl-accent)_25%,transparent)]' : ''}`}>
-        {q.status === 'done' && <div className="absolute inset-y-0 left-0 w-1 bg-good" />}
-        {q.status === 'failed' && <div className="absolute inset-y-0 left-0 w-1 bg-bad" />}
+        {status === 'done' && <div className="absolute inset-y-0 left-0 w-1 bg-good" />}
+        {status === 'failed' && <div className="absolute inset-y-0 left-0 w-1 bg-bad" />}
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -199,7 +213,7 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
                   <span className="font-bold text-muted"><span className="text-good">+{q.xp}</span> / <span className="text-bad">−{q.xp}</span></span>
                 </>
               ) : (
-                <span className={`font-black ${q.status === 'done' ? 'text-good' : 'text-bad'}`}>{q.status === 'done' ? `+${q.xp}` : `−${q.xp}`} XP</span>
+                <span className={`font-black ${status === 'done' ? 'text-good' : 'text-bad'}`}>{status === 'done' ? `+${q.xp}` : `−${q.xp}`} XP</span>
               )}
             </div>
           </div>
@@ -208,14 +222,14 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
 
         <div className="mt-3 flex gap-2" onClick={stop}>
           {!pending ? (
-            q.canUndo && (
+            q.canUndo && !optimistic && (
               <button onClick={() => run(`/quests/${q.id}/undo`, 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
                 <Undo2 size={13} /> Undo
               </button>
             )
           ) : confirm === 'clear' ? (
             <>
-              <button onClick={() => { setConfirm(null); run(`/quests/${q.id}/complete`, `Quest cleared! +${q.xp} XP`, 'good'); }}
+              <button onClick={() => { setConfirm(null); setOptimistic('done'); run(`/quests/${q.id}/complete`, `Quest cleared! +${q.xp} XP`, 'good', 'POST', rollback); }}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/60 bg-good/20 py-2 text-sm font-bold text-good">
                 <Check size={16} /> Confirm clear (+{q.xp} XP)
               </button>
@@ -226,7 +240,7 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
               <button
                 onClick={() => {
                   setConfirm(null);
-                  if (confirm === 'fail') run(`/quests/${q.id}/fail`, `Quest abandoned. −${q.xp} XP`, 'bad');
+                  if (confirm === 'fail') { setOptimistic('failed'); run(`/quests/${q.id}/fail`, `Quest abandoned. −${q.xp} XP`, 'bad', 'POST', rollback); }
                   else run(`/quests/${q.id}`, 'Quest removed', 'info', 'DELETE');
                 }}
                 className="flex-1 rounded-xl border border-bad/50 bg-bad/15 py-2 text-sm font-bold text-bad">

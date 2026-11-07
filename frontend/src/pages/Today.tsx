@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Moon, Pause, Target, ChevronRight, Timer, Orbit, ArrowUpDown, ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { Plus, Moon, Pause, ListTodo, Target, ChevronRight, Timer, Orbit, ArrowUpDown, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import { FocusForm } from '../components/Focus';
 import { PrivateUnlockedBar } from '../components/Private';
 import { LootboxButton } from '../components/Lootbox';
@@ -9,6 +9,7 @@ import { DAY_CLEAR_RATIO } from '@shared';
 import { daysLabel, formatDate, formatDay } from '../lib/time';
 import { useAction, type AppState, type Habit } from '../lib/api';
 import { HabitCard, QuestCard, TaskDetail } from '../components/TaskCards';
+import { TodoList } from '../components/Todos';
 import { TaskForm } from '../components/TaskForm';
 import { Panel, ProgressBar, SectionTitle, Sheet, useToast } from '../components/ui';
 
@@ -20,6 +21,8 @@ export function Today({ s }: { s: AppState }) {
   const [editing, setEditing] = useState<Editing>(null);
   const [focusOpen, setFocusOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
+  const [todoOpen, setTodoOpen] = useState(false);
+  const todosLeft = s.todos.filter((x) => !x.done).length;
   const todayHabits = s.habits.filter((h) => h.scheduledToday);
   const restHabits = s.habits.filter((h) => !h.scheduledToday && !h.pausedToday);
   const pausedHabits = s.habits.filter((h) => h.pausedToday);
@@ -52,6 +55,14 @@ export function Today({ s }: { s: AppState }) {
           <ProgressBar pct={t.ratio} className="h-2.5" />
           <span className="absolute top-0 h-2.5 w-0.5 bg-gold" style={{ left: `${DAY_CLEAR_RATIO * 100}%` }} title="Clear line" />
         </div>
+        {/* The to-do list: a quiet row under a hairline, easy to notice without competing with the day's tasks */}
+        <button onClick={() => setTodoOpen(true)}
+          className="mt-3 flex w-full items-center gap-2 border-t border-line pt-3 text-left text-sm text-ink2 transition hover:text-ink">
+          <ListTodo size={16} className="text-accent" />
+          <span className="flex-1 font-semibold">To-do</span>
+          {todosLeft > 0 && <span className="rounded-md bg-accent/15 px-2 py-0.5 text-xs font-bold text-accent">{todosLeft} pending</span>}
+          <ChevronRight size={15} className="text-muted" />
+        </button>
       </Panel>
 
       {s.workoutToday && (
@@ -166,6 +177,10 @@ export function Today({ s }: { s: AppState }) {
 
       <Sheet open={orderOpen} onClose={() => setOrderOpen(false)} title="Habit order">
         {orderOpen && <HabitOrder habits={s.habits} />}
+      </Sheet>
+
+      <Sheet open={todoOpen} onClose={() => setTodoOpen(false)} title="To-do">
+        {todoOpen && <TodoList s={s} />}
       </Sheet>
 
       <Sheet open={focusOpen} onClose={() => setFocusOpen(false)} title="Focus session">

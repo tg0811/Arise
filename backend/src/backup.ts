@@ -8,7 +8,7 @@ import { HttpError } from './game.ts';
 const TABLES = [
   'profile', 'categories', 'tasks', 'habit_logs', 'xp_events', 'currency_events', 'goals', 'store_items',
   'inventory', 'lootbox_claims', 'journal', 'title_unlocks', 'weight_logs', 'focus_sessions', 'reminders_sent',
-  'exercises', 'workout_days', 'workout_plan_items', 'workout_sessions', 'workout_sets', 'runs',
+  'exercises', 'workout_days', 'workout_plan_items', 'workout_sessions', 'workout_sets', 'runs', 'todos',
 ] as const;
 
 /** Settings that are game data (not credentials) and travel with a backup. */
