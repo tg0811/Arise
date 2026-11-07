@@ -331,6 +331,19 @@ const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  `
+  -- 18: personal records, saved when a workout is finished (not recomputed from history on every read),
+  -- and each finished session's PR count.
+  CREATE TABLE exercise_prs (
+    exercise_id INTEGER PRIMARY KEY REFERENCES exercises(id),
+    kg REAL NOT NULL DEFAULT 0,
+    e1rm REAL NOT NULL DEFAULT 0,
+    reps INTEGER NOT NULL DEFAULT 0,
+    seconds INTEGER NOT NULL DEFAULT 0,
+    km REAL NOT NULL DEFAULT 0
+  );
+  ALTER TABLE workout_sessions ADD COLUMN pr_count INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 const DEFAULT_CATEGORIES: [string, string, string][] = [

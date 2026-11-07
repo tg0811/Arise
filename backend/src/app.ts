@@ -691,9 +691,14 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     const { exerciseId } = z.object({ exerciseId: z.number().int() }).parse(await c.req.json());
     return c.json(gate(c, (cx) => addSet(cx, exerciseId)));
   });
+  // Ticking a set or editing its numbers changes nothing else (XP moves only on finish), so the answer is just "ok":
+  // the app has already shown the change, and no full state has to be rebuilt for every tap.
   app.put('/api/gate/sets/:id', async (c) => {
     const b = SetBody.parse(await c.req.json());
-    return c.json(gate(c, (cx) => updateSet(cx, id(c.req.param('id')), b)));
+    const cx = ctx(c);
+    settle(cx);
+    updateSet(cx, id(c.req.param('id')), b);
+    return c.json({ ok: true });
   });
   app.delete('/api/gate/sets/:id', (c) => c.json(gate(c, (cx) => removeSet(cx, id(c.req.param('id'))))));
   app.post('/api/gate/session/finish', async (c) => {

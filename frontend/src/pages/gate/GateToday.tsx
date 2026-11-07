@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Check, X, Plus, Trash2, Timer, Undo2, Swords, Moon, Trophy, CalendarDays } from 'lucide-react';
+import { Check, X, Plus, Trash2, Undo2, Swords, Moon, Trophy, CalendarDays } from 'lucide-react';
 import { addDays, e1rm } from '@shared';
-import { useGate, useGateAction, type Gate, type GateExercise, type GateSession, type GateSet } from '../../lib/api';
+import { flushSetSaves, useGate, useGateAction, useSetUpdate, type Gate, type GateExercise, type GateSession, type GateSet } from '../../lib/api';
 import { sfx } from '../../lib/sound';
 import { Button, Panel, Sheet, useToast } from '../../components/ui';
 import { ExercisePicker, KindIcon, WEEKDAY_NAMES, targetText } from './shared';
@@ -11,7 +11,6 @@ import { formatDay, weekdayName } from '../../lib/time';
 import { holdCelebrations } from '../../lib/celebrate';
 import { ClearSplash } from './effects';
 
-const REST_SECONDS = 90;
 
 export function GateToday() {
   const { data: g } = useGate();
@@ -140,7 +139,6 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
   const action = useGateAction();
   const toast = useToast();
   const [picker, setPicker] = useState(false);
-  const [restUntil, setRestUntil] = useState<number | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const active = session.status === 'active';
   const elapsed = useElapsed(session.startedAt, active);
@@ -156,10 +154,11 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
   const finish = () => {
     release.current = holdCelebrations();
     const summary = { title: session.title, sets: doneSets, minutes: elapsed, scheduled: session.scheduled };
-    action.mutate({ path: '/session/finish', body: {} }, {
+    // The last ticks may still be on their way: finish only after they've landed.
+    flushSetSaves().then(() => action.mutate({ path: '/session/finish', body: {} }, {
       onSuccess: () => { sfx.levelUp(); setCleared(summary); },
       onError: (e) => { closeSplash(); toast(e.message, 'bad'); },
-    });
+    }));
   };
 
   const splash = (
@@ -202,11 +201,10 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
         </div>
       </div>
 
-      {restUntil && <RestTimer until={restUntil} onDone={() => setRestUntil(null)} />}
 
       <div className="space-y-3">
         {session.exercises.map((ex) => (
-          <ExerciseBlock key={ex.exerciseId} ex={ex} lib={g.exercises.find((e) => e.id === ex.exerciseId)} onTicked={() => setRestUntil(Date.now() + REST_SECONDS * 1000)} />
+          <ExerciseBlock key={ex.exerciseId} ex={ex} lib={g.exercises.find((e) => e.id === ex.exerciseId)} />
         ))}
       </div>
 
@@ -236,30 +234,7 @@ function SessionView({ g, session }: { g: Gate; session: GateSession }) {
   );
 }
 
-function RestTimer({ until, onDone }: { until: number; onDone: () => void }) {
-  const [left, setLeft] = useState(Math.ceil((until - Date.now()) / 1000));
-  useEffect(() => {
-    const t = setInterval(() => {
-      const l = Math.ceil((until - Date.now()) / 1000);
-      setLeft(l);
-      if (l <= 0) {
-        clearInterval(t);
-        navigator.vibrate?.(200);
-        onDone();
-      }
-    }, 250);
-    return () => clearInterval(t);
-  }, [until, onDone]);
-  return (
-    <div className="sticky top-24 z-30 mb-3 flex items-center gap-3 rounded-xl border border-accent2/40 bg-panel px-3 py-2 text-sm">
-      <Timer size={15} className="text-accent2" />
-      <span className="flex-1 text-ink2">Rest <span className="font-bold tabular-nums text-ink">{Math.floor(left / 60)}:{String(Math.max(0, left % 60)).padStart(2, '0')}</span></span>
-      <button onClick={onDone} className="text-xs font-bold text-muted hover:text-ink">Skip</button>
-    </div>
-  );
-}
-
-function ExerciseBlock({ ex, lib, onTicked }: { ex: GateSession['exercises'][number]; lib?: GateExercise; onTicked: () => void }) {
+function ExerciseBlock({ ex, lib }: { ex: GateSession['exercises'][number]; lib?: GateExercise }) {
   const action = useGateAction();
   return (
     <Panel brackets={false} className="p-4">
@@ -279,7 +254,7 @@ function ExerciseBlock({ ex, lib, onTicked }: { ex: GateSession['exercises'][num
         <span />
       </div>
       <div className="space-y-1.5">
-        {ex.sets.map((st) => <SetRow key={st.id} st={st} kind={ex.kind} prs={lib?.prs} name={ex.name} onTicked={onTicked} />)}
+        {ex.sets.map((st) => <SetRow key={st.id} st={st} kind={ex.kind} prs={lib?.prs && runningBest(lib.prs, ex.sets, st.id)} name={ex.name} />)}
       </div>
       <button onClick={() => action.mutate({ path: '/session/sets', body: { exerciseId: ex.exerciseId } })} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-accent">
         <Plus size={13} /> Add set
@@ -288,29 +263,44 @@ function ExerciseBlock({ ex, lib, onTicked }: { ex: GateSession['exercises'][num
   );
 }
 
-function SetRow({ st, kind, prs, name, onTicked }: { st: GateSet; kind: GateExercise['kind']; prs?: GateExercise['prs']; name: string; onTicked: () => void }) {
+/**
+ * The best to beat right now, kept in memory during the workout: the saved record (from finished workouts) raised by
+ * every other set already ticked today. Hit 25 kg on set 1 against a saved 20 kg, and set 2 has to beat 25.
+ * The saved record itself is only updated when the workout is finished.
+ */
+function runningBest(saved: GateExercise['prs'], sets: GateSet[], exceptId: number): GateExercise['prs'] {
+  if (!(saved.kg || saved.e1rm || saved.km)) return saved; // nothing saved yet: no record to beat
+  const b = { ...saved };
+  for (const x of sets) {
+    if (!x.done || x.id === exceptId) continue;
+    b.kg = Math.max(b.kg, x.kg ?? 0);
+    b.e1rm = Math.max(b.e1rm, e1rm(x.kg ?? 0, x.reps ?? 0));
+    b.km = Math.max(b.km, x.km ?? 0);
+  }
+  return b;
+}
+
+function SetRow({ st, kind, prs, name }: { st: GateSet; kind: GateExercise['kind']; prs?: GateExercise['prs']; name: string }) {
   const action = useGateAction();
+  const saveSet = useSetUpdate();
   const toast = useToast();
   const cardio = kind === 'cardio';
   const [a, setA] = useState(String(cardio ? (st.seconds ? Math.round(st.seconds / 60) : '') : (st.reps ?? '')));
   const [b, setB] = useState(String(cardio ? (st.km ?? '') : (st.kg ?? '')));
-  // Local tick state: the tap shows instantly, and repeat taps are ignored until the server confirms.
-  const [done, setDone] = useState(st.done);
-  const [ticking, setTicking] = useState(false);
-  useEffect(() => { if (!ticking) setDone(st.done); }, [st.done, ticking]);
+  const done = st.done; // straight from the cache, which a tap updates at once
   const num = (v: string) => (v.trim() === '' ? null : Number(v));
   const values = () => (cardio
     ? { reps: null, kg: null, seconds: num(a) === null ? null : Math.round(num(a)! * 60), km: num(b) }
     : { reps: num(a), kg: num(b), seconds: null, km: null });
+  const fail = (e: Error) => toast(e.message, 'bad');
 
   /** Field edits save numbers only; they never change whether the set is ticked. */
-  const saveValues = () => action.mutate({ method: 'PUT', path: `/sets/${st.id}`, body: values() }, { onError: (e) => toast(e.message, 'bad') });
+  const saveValues = () => saveSet(st.id, values(), fail);
 
   const tick = () => {
-    if (ticking) return;
     const next = !done;
     const v = values();
-    // New PR? Compare against records from before this set (only if there were records to beat).
+    // New PR? `prs` is the running best (saved record + today's other ticked sets), only if a record exists.
     if (next && prs) {
       const kg = v.kg ?? 0;
       if ((prs.kg > 0 && kg > prs.kg) || (prs.e1rm > 0 && e1rm(kg, v.reps ?? 0) > prs.e1rm)) {
@@ -321,13 +311,7 @@ function SetRow({ st, kind, prs, name, onTicked }: { st: GateSet; kind: GateExer
         toast(`New PR! ${name}: ${v.km} km`, 'good');
       }
     }
-    setDone(next);
-    setTicking(true);
-    action.mutate({ method: 'PUT', path: `/sets/${st.id}`, body: { ...v, done: next } }, {
-      onSuccess: () => { if (next) onTicked(); },
-      onError: (e) => { setDone(!next); toast(e.message, 'bad'); },
-      onSettled: () => setTicking(false),
-    });
+    saveSet(st.id, { ...v, done: next }, fail);
   };
 
   return (

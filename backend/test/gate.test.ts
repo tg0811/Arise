@@ -149,7 +149,8 @@ test('editing a set\'s numbers never unticks it (no done field = keep)', async (
   let r = await h.call('POST', '/api/gate/session/start');
   const st = r.gate.session.exercises[0].sets[0];
   await h.call('PUT', `/api/gate/sets/${st.id}`, { reps: 8, kg: 60, done: true });
-  r = await h.call('PUT', `/api/gate/sets/${st.id}`, { reps: 8, kg: 62.5 });
+  await h.call('PUT', `/api/gate/sets/${st.id}`, { reps: 8, kg: 62.5 });
+  r = await h.call('GET', '/api/gate');
   const after = r.gate.session.exercises[0].sets[0];
   assert.deepEqual([after.kg, after.done], [62.5, true]);
 });
@@ -187,4 +188,34 @@ test('the day you first build your plan, changes apply at once', async () => {
   assert.equal(r.gate.todayPlan.scheduled, true);
   const after = await h.call('PUT', '/api/gate/days/1', { name: 'Push', isRest: true });
   assert.equal(after.gate.todayPlan.scheduled, false);
+});
+
+test('records are saved when a workout is finished, not while it runs; undo takes them back out', async () => {
+  const { h, bench } = await withPlan();
+  let r = await h.call('POST', '/api/gate/session/start');
+  for (const st of r.gate.session.exercises[0].sets) await h.call('PUT', `/api/gate/sets/${st.id}`, { reps: 8, kg: 60, done: true });
+  await h.call('POST', '/api/gate/session/finish', {});
+  h.advance(24 * 7); // next Monday
+  r = await h.call('POST', '/api/gate/session/start');
+  const sets = r.gate.session.exercises[0].sets;
+  await h.call('PUT', `/api/gate/sets/${sets[0].id}`, { reps: 8, kg: 80, done: true });
+  r = await h.call('GET', '/api/gate');
+  const lib = () => r.gate.exercises.find((e: any) => e.id === bench);
+  assert.equal(lib().prs.kg, 60, 'mid-workout: the record is still last week\'s');
+  r = await h.call('POST', '/api/gate/session/finish', {});
+  assert.equal(lib().prs.kg, 80, 'saved on finish');
+  assert.equal(r.gate.history[0].prs, 1, 'this session set a record');
+  assert.equal(r.gate.history[1].prs, 0, 'the first session had nothing to beat');
+  r = await h.call('POST', '/api/gate/session/undo');
+  assert.equal(lib().prs.kg, 60, 'undo removed the new record');
+  r = await h.call('POST', '/api/gate/session/finish', {});
+  assert.equal(lib().prs.kg, 80);
+});
+
+test('history logged before records were stored is filled in once', async () => {
+  const { h, bench } = await withPlan();
+  await doWorkout(h);
+  h.db.exec('DELETE FROM exercise_prs; UPDATE workout_sessions SET pr_count = 0');
+  const r = await h.call('GET', '/api/gate');
+  assert.equal(r.gate.exercises.find((e: any) => e.id === bench).prs.kg, 60);
 });

@@ -10,7 +10,7 @@ const SINCE_KEY = 'workout_schedule_since';
 
 interface DayRow { weekday: number; name: string; is_rest: number }
 interface ItemRow { id: number; weekday: number; exercise_id: number; sort: number; target_sets: number; target_reps: number | null; target_kg: number | null; target_min: number | null }
-interface SessionRow { id: number; date: string; title: string; scheduled: number; started_at: string | null; finished_at: string | null; status: 'active' | 'done' | 'missed'; note: string }
+interface SessionRow { id: number; date: string; title: string; scheduled: number; started_at: string | null; finished_at: string | null; status: 'active' | 'done' | 'missed'; note: string; pr_count: number }
 interface SetRow { id: number; session_id: number; exercise_id: number; sort: number; set_no: number; reps: number | null; kg: number | null; seconds: number | null; km: number | null; done: number }
 interface ExerciseRow { id: number; name: string; kind: ExerciseKind; muscle: string; archived: number }
 
@@ -253,6 +253,7 @@ export function finishSession(ctx: Ctx, note = '') {
     const doneSets = (ctx.db.prepare('SELECT COUNT(*) AS n FROM workout_sets WHERE session_id = ? AND done = 1').get(s.id) as { n: number }).n;
     if (!doneSets) throw new HttpError(400, 'Tick at least one set before finishing');
     ctx.db.prepare("UPDATE workout_sessions SET status = 'done', finished_at = ?, note = ? WHERE id = ?").run(ctx.at.toISOString(), note, s.id);
+    savePrs(ctx.db, s.id);
     // Planned or extra, an honest session pays the same (one session a day at most).
     const label = `Workout: ${s.title}`;
     addXp(ctx, s.date, WORKOUT_XP, bodyCategory(ctx.db), 'workout', s.id, label);
@@ -266,7 +267,8 @@ export function undoFinish(ctx: Ctx) {
   if (!s || s.status !== 'done') throw new HttpError(409, 'Nothing to undo today');
   tx(ctx.db, () => {
     removeEvents(ctx.db, 'workout', s.id);
-    ctx.db.prepare("UPDATE workout_sessions SET status = 'active', finished_at = NULL WHERE id = ?").run(s.id);
+    ctx.db.prepare("UPDATE workout_sessions SET status = 'active', finished_at = NULL, pr_count = 0 WHERE id = ?").run(s.id);
+    rebuildPrs(ctx.db); // take this session's records back out
   });
 }
 
@@ -375,6 +377,70 @@ function prsFor(sets: SetRow[]): Prs {
   return p;
 }
 
+// ---------------------------------------------------------------- stored records
+
+// Records live in exercise_prs and are written when a workout is finished. While a workout runs they're only read
+// (so "New PR!" compares against everything before today). Rebuilt from history only after an undo, or once to fill
+// the table for history logged before it existed.
+
+const ZERO: Prs = { kg: 0, e1rm: 0, reps: 0, seconds: 0, km: 0 };
+const hasAny = (p: Prs) => !!(p.kg || p.e1rm || p.reps || p.seconds || p.km);
+const beats = (now: Prs, before: Prs) =>
+  now.kg > before.kg || now.e1rm > before.e1rm || now.reps > before.reps || now.seconds > before.seconds || now.km > before.km;
+const maxOf = (a: Prs, b: Prs): Prs => ({
+  kg: Math.max(a.kg, b.kg), e1rm: Math.max(a.e1rm, b.e1rm), reps: Math.max(a.reps, b.reps), seconds: Math.max(a.seconds, b.seconds), km: Math.max(a.km, b.km),
+});
+
+function storedPrs(db: DB): Map<number, Prs> {
+  const rows = db.prepare('SELECT * FROM exercise_prs').all() as unknown as (Prs & { exercise_id: number })[];
+  return new Map(rows.map((r) => [r.exercise_id, { kg: r.kg, e1rm: r.e1rm, reps: r.reps, seconds: r.seconds, km: r.km }]));
+}
+
+function writePr(db: DB, exerciseId: number, p: Prs) {
+  db.prepare(`INSERT INTO exercise_prs (exercise_id, kg, e1rm, reps, seconds, km) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(exercise_id) DO UPDATE SET kg = excluded.kg, e1rm = excluded.e1rm, reps = excluded.reps, seconds = excluded.seconds, km = excluded.km`)
+    .run(exerciseId, p.kg, p.e1rm, p.reps, p.seconds, p.km);
+}
+
+/** Fold one finished session into the records; returns how many exercises it set a record in. */
+function foldSession(db: DB, sessionId: number, best: Map<number, Prs>): number {
+  const sets = db.prepare('SELECT * FROM workout_sets WHERE session_id = ? AND done = 1').all(sessionId) as unknown as SetRow[];
+  const byEx = new Map<number, SetRow[]>();
+  for (const st of sets) byEx.set(st.exercise_id, [...(byEx.get(st.exercise_id) ?? []), st]);
+  let n = 0;
+  for (const [exId, ss] of byEx) {
+    const now = prsFor(ss);
+    const before = best.get(exId) ?? ZERO;
+    if (hasAny(before) && beats(now, before)) n++;
+    best.set(exId, maxOf(before, now));
+  }
+  return n;
+}
+
+/** On finish: compare this session with the stored records, save the new bests and its PR count. */
+function savePrs(db: DB, sessionId: number) {
+  const best = storedPrs(db);
+  const before = new Map(best);
+  const n = foldSession(db, sessionId, best);
+  for (const [exId, p] of best) if (p !== before.get(exId)) writePr(db, exId, p);
+  db.prepare('UPDATE workout_sessions SET pr_count = ? WHERE id = ?').run(n, sessionId);
+}
+
+/** Recompute every record and PR count from finished sessions, oldest first (one pass). */
+export function rebuildPrs(db: DB) {
+  db.prepare('DELETE FROM exercise_prs').run();
+  const best = new Map<number, Prs>();
+  const done = db.prepare("SELECT id FROM workout_sessions WHERE status = 'done' ORDER BY date, id").all() as { id: number }[];
+  for (const { id } of done) db.prepare('UPDATE workout_sessions SET pr_count = ? WHERE id = ?').run(foldSession(db, id, best), id);
+  for (const [exId, p] of best) writePr(db, exId, p);
+}
+
+/** History logged before records were stored (or restored from an older backup): fill the table once. */
+function ensurePrs(db: DB) {
+  const empty = !db.prepare('SELECT 1 FROM exercise_prs LIMIT 1').get();
+  if (empty && db.prepare("SELECT 1 FROM workout_sessions WHERE status = 'done' LIMIT 1").get()) tx(db, () => rebuildPrs(db));
+}
+
 // ---------------------------------------------------------------- state
 
 const setView = (s: SetRow) => ({ id: s.id, setNo: s.set_no, reps: s.reps, kg: s.kg, seconds: s.seconds, km: s.km, done: !!s.done });
@@ -434,15 +500,17 @@ export function gateState(ctx: Ctx) {
   const sessions = db.prepare('SELECT * FROM workout_sessions ORDER BY date DESC LIMIT 120').all() as unknown as SessionRow[];
   const allDone = db.prepare(`SELECT ws.*, s.date FROM workout_sets ws JOIN workout_sessions s ON s.id = ws.session_id
     WHERE ws.done = 1 ORDER BY s.date, ws.id`).all() as unknown as (SetRow & { date: string })[];
+  ensurePrs(db);
+  const records = storedPrs(db);
+  const setsBySession = new Map<number, (SetRow & { date: string })[]>();
+  const setsByExercise = new Map<number, (SetRow & { date: string })[]>();
+  for (const d of allDone) {
+    setsBySession.set(d.session_id, [...(setsBySession.get(d.session_id) ?? []), d]);
+    setsByExercise.set(d.exercise_id, [...(setsByExercise.get(d.exercise_id) ?? []), d]);
+  }
   const history = sessions.map((x) => {
-    const sets = allDone.filter((d) => d.session_id === x.id);
-    let prCount = 0;
-    for (const exId of new Set(sets.map((d) => d.exercise_id))) {
-      const before = prsFor(allDone.filter((d) => d.exercise_id === exId && d.date < x.date));
-      const now = prsFor(sets.filter((d) => d.exercise_id === exId));
-      if ((before.kg || before.e1rm || before.reps || before.seconds || before.km) &&
-        (now.kg > before.kg || now.e1rm > before.e1rm || now.reps > before.reps || now.seconds > before.seconds || now.km > before.km)) prCount++;
-    }
+    const sets = setsBySession.get(x.id) ?? [];
+    const prCount = x.pr_count ?? 0; // saved at finish
     const minutes = x.started_at && x.finished_at ? Math.round((Date.parse(x.finished_at) - Date.parse(x.started_at)) / 60_000) : null;
     return {
       id: x.id, date: x.date, title: x.title, status: x.status, scheduled: !!x.scheduled, minutes, note: x.note,
@@ -456,12 +524,12 @@ export function gateState(ctx: Ctx) {
 
   // Library with PRs and a per-session progress series
   const library = exercises.map((e) => {
-    const sets = allDone.filter((d) => d.exercise_id === e.id);
+    const sets = setsByExercise.get(e.id) ?? [];
     const byDate = new Map<string, typeof sets>();
     for (const d of sets) byDate.set(d.date, [...(byDate.get(d.date) ?? []), d]);
     return {
       id: e.id, name: e.name, kind: e.kind, muscle: e.muscle, archived: !!e.archived,
-      prs: prsFor(sets),
+      prs: records.get(e.id) ?? ZERO, // saved at finish: during a workout, today's sets aren't in it yet
       sessions: byDate.size,
       series: [...byDate.entries()].map(([d, ss]) => ({ date: d, ...prsFor(ss) })),
     };

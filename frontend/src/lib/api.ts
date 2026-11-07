@@ -194,6 +194,30 @@ export interface Gate {
 
 export const useGate = () => useQuery({ queryKey: ['gate'], queryFn: async () => (await api<{ gate: Gate; state: AppState }>('GET', '/gate')).gate });
 
+/**
+ * Save one set (tick or numbers). The screen updates first, straight in the cache; the request runs in the background
+ * and the server only answers "ok". Requests for the same set go out one after another, so fast re-taps land in order.
+ * If one fails, the Dungeon reloads from the server (the true state) and `onError` gets the message.
+ */
+const setQueues = new Map<number, Promise<unknown>>();
+export function useSetUpdate() {
+  const qc = useQueryClient();
+  return (setId: number, body: { reps: number | null; kg: number | null; seconds: number | null; km: number | null; done?: boolean }, onError?: (e: Error) => void) => {
+    qc.cancelQueries({ queryKey: ['gate'] }); // a refetch already in flight must not paint over this change
+    qc.setQueryData<Gate>(['gate'], (g) => (g?.session ? {
+      ...g,
+      session: { ...g.session, exercises: g.session.exercises.map((e) => ({ ...e, sets: e.sets.map((x) => (x.id === setId ? { ...x, ...body } : x)) })) },
+    } : g));
+    const next = (setQueues.get(setId) ?? Promise.resolve())
+      .then(() => api<{ ok: true }>('PUT', `/gate/sets/${setId}`, body))
+      .catch((e: Error) => { onError?.(e); qc.invalidateQueries({ queryKey: ['gate'] }); });
+    setQueues.set(setId, next);
+  };
+}
+
+/** Resolves once every set save sent so far has reached the server (call before finishing a workout). */
+export const flushSetSaves = () => Promise.all(setQueues.values());
+
 /** Gate mutations return both the Gate's state and the main app's (XP, header, Today). */
 export function useGateAction() {
   const qc = useQueryClient();
