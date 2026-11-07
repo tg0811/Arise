@@ -51,6 +51,7 @@ Step-by-step runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md). New to Docker/nginx/HT
 
 ```bash
 ./deploy.sh                     # rsync this folder to the server, rebuild, health-check
+ssh tghf-prod /opt/tghf/solo-leveling/deploy-from-server.sh   # or: deploy GitHub main from the server itself (phone-friendly)
 ```
 
 - The server holds the **live database** in `deploy/data/` (never synced by `deploy.sh`); local `data/` is only a dev copy.

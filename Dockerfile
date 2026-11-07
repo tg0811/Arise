@@ -10,6 +10,11 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# Not part of the normal image: deploy-from-server.sh builds this stage first (docker build --target check)
+# so a deploy straight from GitHub still runs the typecheck and the backend tests.
+FROM build AS check
+RUN npm run typecheck && npm test
+
 FROM node:26-slim
 WORKDIR /app
 ENV NODE_ENV=production DATA_DIR=/data PORT=8787

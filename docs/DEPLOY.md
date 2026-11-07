@@ -154,6 +154,31 @@ Commit your changes, then from `SoloLeveling/`:
 
 It asks for your SSH key's passphrase **once** (one shared connection for every step). It first runs every check (typecheck, backend tests, browser smoke test, about 30 s) and **deploys nothing if one fails**. Then it copies the code (never the database or `.env`), rebuilds, restarts and checks both the app and HTTPS. Downtime is a few seconds. nginx and the certificate don't need touching.
 
+## Deploying from the server (e.g. from your phone)
+
+`deploy-from-server.sh` runs **on the server** and deploys whatever is on GitHub `main`. You don't need your laptop: from any SSH app on the phone (Termius, JuiceSSH, Termux):
+
+```bash
+ssh tghf-prod /opt/tghf/solo-leveling/deploy-from-server.sh
+```
+
+It fetches `main`, runs the typecheck and backend tests in Docker (about 1 min; the browser test only runs in `./deploy.sh`), then rebuilds, restarts and checks the app. If a check fails, the running app is not touched. The database (`deploy/data/`) and `deploy/.env` are never touched. `SKIP_CHECKS=1` skips the tests (emergencies only). Running it twice at once is blocked.
+
+Only **pushed** commits are deployed. If you last ran `./deploy.sh` with uncommitted work, this replaces it with the GitHub version.
+
+### One-time setup
+
+The repo is public, so the server needs no GitHub key. Copy the script over once from the laptop, then run it. The first run turns the folder into a git checkout of `https://github.com/tg0811/Arise.git` (`deploy/data` and `deploy/.env` are git-ignored and stay):
+
+```bash
+scp deploy-from-server.sh tghf-prod:/opt/tghf/solo-leveling/
+ssh tghf-prod 'chmod +x /opt/tghf/solo-leveling/deploy-from-server.sh && /opt/tghf/solo-leveling/deploy-from-server.sh'
+```
+
+The server needs `git` (`git --version`; if missing: `sudo apt install -y git`).
+
+After that, every `./deploy.sh` from the laptop and every `deploy-from-server.sh` run work side by side.
+
 ## Useful commands (on the server, in `/opt/tghf/solo-leveling/deploy`)
 
 | What | Command |

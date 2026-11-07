@@ -27,7 +27,7 @@ trap 'exit 130' INT TERM
 
 rsync -az --delete -e "$SSH" \
   --exclude node_modules --exclude dist --exclude dev-dist --exclude .git --exclude test-results --exclude playwright-report \
-  --exclude /data --exclude /deploy/data --exclude /deploy/.env \
+  --exclude /data --exclude /deploy/data --exclude /deploy/.env --exclude /.deploy.lock \
   ./ "$HOST:$DIR/"
 $SSH "$HOST" "cd $DIR/deploy && docker compose up -d --build && docker image prune -f >/dev/null"
 sleep 3

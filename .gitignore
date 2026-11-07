@@ -7,3 +7,4 @@ data/
 dev-dist/
 test-results/
 playwright-report/
+.deploy.lock

@@ -8,3 +8,4 @@ deploy
 *.db-*
 test-results
 playwright-report
+.deploy.lock
