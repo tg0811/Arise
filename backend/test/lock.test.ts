@@ -68,3 +68,12 @@ test('passkey endpoints: only for this site, challenge needed, garbage rejected'
   await assert.rejects(h.call('POST', '/api/lock/passkey/verify', { response: { id: 'x' } }), { status: 400 });
   await assert.rejects(h.call('GET', '/api/state'), { status: 423 });
 });
+
+test('password reset needs a real fingerprint check, not just a login', async () => {
+  const h = harness();
+  await h.boot();
+  // No passkey challenge / garbage response: refused, and the password is unchanged.
+  await assert.rejects(h.call('POST', '/api/password/reset', { response: { id: 'x' }, next: 'brandnew1' }), { status: 400 });
+  await assert.rejects(h.call('POST', '/api/password/reset', { next: 'brandnew1' }), { status: 400 });
+  await assert.rejects(h.call('POST', '/api/auth/login', { password: 'brandnew1' }), { status: 401 });
+});

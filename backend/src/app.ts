@@ -316,6 +316,15 @@ export function createApp(db: DB, clock: () => Date = () => new Date(), rng?: ()
     deleteOtherSessions(db, getCookie(c, COOKIE)!);
     return c.json({ ok: true });
   });
+  // Forgot the password: a fresh fingerprint (passkey) check stands in for the current one.
+  app.post('/api/password/reset', async (c) => {
+    const b = z.object({ response: z.any(), next: z.string().min(6).max(200) }).parse(await c.req.json());
+    const token = getCookie(c, COOKIE)!;
+    await verifyPasskey(db, token, rp(c), b.response, clock());
+    setPassword(db, b.next);
+    deleteOtherSessions(db, token);
+    return c.json({ ok: true });
+  });
 
   // ------------------------------------------------------------ state & profile
   app.get('/api/state', (c) => c.json(state(c)));

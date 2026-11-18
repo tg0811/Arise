@@ -9,7 +9,7 @@ import { Avatar, resizeImage } from '../components/Avatar';
 import { BodyStats } from '../components/BodyStats';
 import { LOCK_AFTER_MINUTES, USERNAME_RE } from '@shared';
 import { formatDate } from '../lib/time';
-import { devicePasskeyId, forgetDevicePasskey, passkeysSupported, setUpPasskey } from '../lib/passkey';
+import { devicePasskeyId, forgetDevicePasskey, passkeysSupported, resetPasswordWithPasskey, setUpPasskey } from '../lib/passkey';
 import { Button, CATEGORY_ICONS, CategoryIcon, Panel, SectionTitle, Sheet, useToast } from '../components/ui';
 
 const COLORS = ['#60a5fa', '#f87171', '#c084fc', '#facc15', '#fb923c', '#4ade80', '#22d3ee', '#f472b6', '#a3e635', '#e2e8f0'];
@@ -106,7 +106,7 @@ export function Settings({ s }: { s: AppState }) {
       </div>
 
       <Sheet open={pwOpen} onClose={() => setPwOpen(false)} title="Change password">
-        {pwOpen && <PasswordForm onDone={() => setPwOpen(false)} />}
+        {pwOpen && <PasswordForm canReset={s.lock.passkeys.length > 0 && passkeysSupported()} onDone={() => setPwOpen(false)} />}
       </Sheet>
 
       <Sheet open={editingCat !== null} onClose={() => setEditingCat(null)} title={editingCat === 'new' ? 'New category' : 'Edit category'}>
@@ -116,8 +116,9 @@ export function Settings({ s }: { s: AppState }) {
   );
 }
 
-function PasswordForm({ onDone }: { onDone: () => void }) {
+function PasswordForm({ canReset, onDone }: { canReset: boolean; onDone: () => void }) {
   const toast = useToast();
+  const [forgot, setForgot] = useState(false);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -130,7 +131,8 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
     if (next !== confirm) return setError('New passwords do not match');
     setBusy(true);
     try {
-      await api('POST', '/password', { current, next });
+      if (forgot) await resetPasswordWithPasskey(next);
+      else await api('POST', '/password', { current, next });
       toast('Password changed. Other devices are signed out.', 'good');
       onDone();
     } catch (err) {
@@ -142,12 +144,23 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <input type="password" className="field" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" autoFocus />
+      {forgot ? (
+        <p className="flex items-center gap-2 text-sm text-muted"><Fingerprint size={15} /> Your fingerprint confirms it's you, instead of the current password.</p>
+      ) : (
+        <input type="password" className="field" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" autoFocus />
+      )}
       <input type="password" className="field" placeholder="New password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" />
       <input type="password" className="field" placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
       {error && <p className="text-sm font-semibold text-bad">{error}</p>}
       <p className="text-xs text-muted">At least 6 characters. Your other devices will need to log in again.</p>
-      <Button type="submit" className="w-full" disabled={busy || !current || next.length < 6}>Change password</Button>
+      <Button type="submit" className="w-full" disabled={busy || (!forgot && !current) || next.length < 6}>
+        {forgot ? <><Fingerprint size={15} /> Reset with fingerprint</> : 'Change password'}
+      </Button>
+      {canReset && (
+        <button type="button" className="w-full text-center text-xs font-semibold text-muted underline-offset-2 hover:underline" onClick={() => { setForgot(!forgot); setError(''); }}>
+          {forgot ? 'I remember it' : 'Forgot password?'}
+        </button>
+      )}
     </form>
   );
 }

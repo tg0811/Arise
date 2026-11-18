@@ -54,4 +54,13 @@ export async function unlockWithPasskey(purpose: 'app' | 'private' = 'app') {
   markDevice(response.id); // whichever passkey answered lives on this device
 }
 
+/** Forgot the password: prove it's you with this device's fingerprint, then set a new one. */
+export async function resetPasswordWithPasskey(next: string) {
+  const optionsJSON = await api<any>('POST', '/lock/passkey/options');
+  let response;
+  try { response = await startAuthentication({ optionsJSON }); } catch (e) { throw friendly(e); }
+  await api('POST', '/password/reset', { response, next });
+  markDevice(response.id);
+}
+
 export const forgetDevicePasskey = () => markDevice(null);
