@@ -9,7 +9,8 @@ import '@fontsource/outfit/900.css';
 import '@fontsource/rajdhani/600.css';
 import '@fontsource/rajdhani/700.css';
 import './index.css';
-import { LOCKED_EVENT, api, useAppState } from './lib/api';
+import { LOCKED_EVENT, api, useAppState, type AppState } from './lib/api';
+import { LOCK_AFTER_MINUTES } from '@shared';
 import { LockScreen } from './pages/LockScreen';
 import { applyTheme } from './lib/theme';
 import { ToastProvider } from './components/ui';
@@ -89,6 +90,33 @@ function App() {
     const onLocked = () => void qc.invalidateQueries({ queryKey: ['auth'] });
     window.addEventListener(LOCKED_EVENT, onLocked);
     return () => window.removeEventListener(LOCKED_EVENT, onLocked);
+  }, [qc]);
+  // Back after LOCK_AFTER_MINUTES away (another app, screen off): lock on the spot, from the device's own clock,
+  // instead of waiting for a request to come back "locked". The server is told too, so both agree.
+  useEffect(() => {
+    // Last moment the app was on screen. A heartbeat keeps it fresh; it stops while the page is hidden, frozen
+    // or the phone sleeps, so the gap shows even when the browser never sent a "hidden" event.
+    let seen = Date.now();
+    const check = () => {
+      if (document.visibilityState === 'hidden') { seen = Date.now(); return; }
+      const away = Date.now() - seen;
+      seen = Date.now();
+      const s = qc.getQueryData<AppState>(['state']);
+      const a = qc.getQueryData<AuthStatus>(['auth']);
+      if (!s?.lock.enabled || !a?.authed || a.locked || away < LOCK_AFTER_MINUTES * 60_000) return;
+      qc.setQueryData<AuthStatus>(['auth'], { ...a, locked: true, passkeys: s.lock.passkeys.length });
+      void api('POST', '/lock/now').catch(() => {}).finally(() => qc.invalidateQueries({ queryKey: ['auth'] }));
+    };
+    const beat = setInterval(() => { if (document.visibilityState === 'visible') check(); }, 5_000);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('pageshow', check); // restored from the back/forward cache
+    window.addEventListener('focus', check);
+    return () => {
+      clearInterval(beat);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('pageshow', check);
+      window.removeEventListener('focus', check);
+    };
   }, [qc]);
   // While locked, keep none of your data in memory either.
   useEffect(() => {

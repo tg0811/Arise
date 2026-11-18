@@ -87,8 +87,15 @@ test('habit: create with several categories, see its days, open details, edit, c
   await edited.getByRole('button', { name: 'Cancel' }).click(); // one tap alone completes nothing
   await expect(edited.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
   await edited.getByRole('button', { name: 'Complete', exact: true }).click();
+  // A slow network must not slow the screen: the card, the day's count and the XP all change on the tap.
+  await page.route('**/api/habits/*/complete', async (r) => { await new Promise((ok) => setTimeout(ok, 2000)); await r.continue(); });
+  await expect(page.getByText('0/1', { exact: true })).toBeVisible();
   await edited.getByRole('button', { name: /^Confirm complete/ }).click();
-  await expect(edited.getByText(/^\+\d+ XP$/)).toBeVisible();
+  await expect(edited.getByText(/^\+\d+ XP$/)).toBeVisible({ timeout: 700 });
+  await expect(page.getByText('1/1', { exact: true })).toBeVisible({ timeout: 700 });
+  await expect(edited.getByRole('button', { name: 'Undo' }), 'no undo before the server has the completion').toBeDisabled();
+  await expect(edited.getByRole('button', { name: 'Undo' })).toBeEnabled({ timeout: 5000 });
+  await page.unroute('**/api/habits/*/complete');
   await expect(page.getByRole('button', { name: 'Close' })).toHaveCount(0); // Complete must not open the card
   await edited.getByRole('button', { name: 'Undo' }).click();
   await expect(edited.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
@@ -276,6 +283,24 @@ test('app lock: set up a fingerprint, lock, unlock with it or the password; lock
   await page.getByPlaceholder('Password').fill('wrong');
   await button('Unlock').click();
   await expect(page.getByText('Wrong password')).toBeVisible();
+  await page.getByPlaceholder('Password').fill(E2E_PASSWORD);
+  await button('Unlock').click();
+  await expect(page.locator('header h1')).toBeVisible();
+
+  // Coming back after more than 5 minutes away locks on the spot, no reload needed.
+  await expect(page.locator('header h1')).toBeVisible();
+  await page.evaluate(() => {
+    const vis = (v: string) => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v }); document.dispatchEvent(new Event('visibilitychange')); };
+    const realNow = Date.now;
+    vis('hidden');
+    Date.now = () => realNow() + 6 * 60_000; // six minutes later
+    vis('visible');
+    Date.now = realNow;
+    delete (document as any).visibilityState;
+  });
+  await expect(page.getByText('UNLOCK TO ARISE')).toBeVisible({ timeout: 1000 });
+  expect((await page.request.get('/api/state')).status(), 'the server agrees: locked').toBe(423);
+  await button('Use password instead').click();
   await page.getByPlaceholder('Password').fill(E2E_PASSWORD);
   await button('Unlock').click();
   await expect(page.locator('header h1')).toBeVisible();

@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { withPending } from './optimistic';
 import type { Difficulty, GoalType, LootType, Mood, Rank, ReminderPrefs } from '@shared';
 
 // Mirrors backend buildState(). Every mutation returns the full fresh state.
@@ -14,7 +15,8 @@ export interface Habit {
   nextDifficulty: { difficulty: Difficulty; from: string } | null;
   /** Private habit; `masked` while this device hasn't unlocked (title/description/category hidden). */
   private: boolean; masked: boolean;
-  log: { status: 'done' | 'failed'; xp: number } | null;
+  /** `pending`: shown from the tap, not yet confirmed by the server (see lib/optimistic.ts). */
+  log: { status: 'done' | 'failed'; xp: number; pending?: boolean } | null;
   streak: number; multiplier: number; xpGain: number; xpLoss: number;
 }
 export interface Quest {
@@ -142,7 +144,7 @@ export async function api<T = AppState>(method: string, path: string, body?: unk
 export const useAppState = () =>
   // Every action already returns the fresh state; this refresh picks up changes made elsewhere
   // (another device, midnight settlement). Coming back to the app refreshes immediately too.
-  useQuery({ queryKey: ['state'], queryFn: () => api('GET', '/state'), refetchInterval: 30_000, refetchOnWindowFocus: true });
+  useQuery({ queryKey: ['state'], queryFn: async () => withPending(await api('GET', '/state')), refetchInterval: 30_000, refetchOnWindowFocus: true });
 
 /** Mutation that replaces the cached state with the server's response. */
 export function useAction() {
@@ -150,7 +152,7 @@ export function useAction() {
   return useMutation({
     mutationFn: ({ method = 'POST', path, body }: { method?: string; path: string; body?: unknown }) => api(method, path, body),
     onSuccess: (state) => {
-      qc.setQueryData(['state'], state);
+      qc.setQueryData(['state'], withPending(state));
       qc.invalidateQueries({ queryKey: ['archive'] });
     },
   });

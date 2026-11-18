@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Undo2, Flame, Clock, Pencil, Skull, Crown, Link2, Trash2, Lock, LockOpen, CalendarDays, Bell } from 'lucide-react';
 import { UnlockSheet } from './Private';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AppState, Habit, Quest } from '../lib/api';
 import { useAction } from '../lib/api';
+import { habitPatch, habitUndoPatch, questPatch, questRemovePatch, useOptimisticAction, type Patch } from '../lib/optimistic';
 import { DIFFICULTY_STYLE } from '../lib/theme';
 import { CategoryIcon, useToast } from './ui';
 import { sfx } from '../lib/sound';
@@ -40,27 +41,17 @@ function DifficultyChip({ d }: { d: string }) {
 }
 
 function useTaskAction() {
-  const action = useAction();
+  const act = useOptimisticAction();
   const toast = useToast();
-  // The sound plays on the tap itself (not after the round trip), so the result feels instant.
-  return (path: string, done?: string, tone: 'good' | 'bad' | 'info' = 'info', method = 'POST', onError?: () => void) => {
+  // Sound, card, list order, counters and XP bar all change on the tap itself; the server confirms after.
+  return (path: string, patch: Patch | null, done?: string, tone: 'good' | 'bad' | 'info' = 'info', method = 'POST') => {
     if (tone === 'good') sfx.complete();
     if (tone === 'bad') sfx.fail();
-    action.mutate({ path, method }, {
+    act(method, path, patch, {
       onSuccess: () => { if (done) toast(done, tone); },
-      onError: (e) => { onError?.(); toast(e.message, 'bad'); },
+      onError: (e) => toast(e.message, 'bad'),
     });
   };
-}
-
-/**
- * Show a result the moment it's confirmed instead of waiting for the server (a phone on mobile data can take a
- * noticeable moment). Cleared as soon as the server's state arrives; rolled back if the request fails.
- */
-function useOptimistic<T>(serverValue: unknown) {
-  const [value, setValue] = useState<T | null>(null);
-  useEffect(() => setValue(null), [serverValue]);
-  return [value, setValue, () => setValue(null)] as const;
 }
 
 /** Card props shared by both kinds: tap the card for details, the pencil goes straight to editing. */
@@ -86,8 +77,7 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
   // Both outcomes take a second tap: no XP is won or lost by a stray touch.
   const [confirm, setConfirm] = useState<null | 'complete' | 'fail'>(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
-  const [optimistic, setOptimistic, rollback] = useOptimistic<'done' | 'failed'>(h.log);
-  const log = h.log ?? (optimistic ? { status: optimistic, xp: optimistic === 'done' ? h.xpGain : -h.xpLoss } : null);
+  const log = h.log;
   const resolved = log !== null;
   const late = !resolved && isLate(h.deadlineTime);
   const unlock = () => setUnlockOpen(true);
@@ -139,18 +129,18 @@ export function HabitCard({ s, h, onOpen, onEdit }: CardProps & { h: Habit }) {
 
         <div className="mt-3 flex gap-2" onClick={stop}>
           {resolved ? (
-            <button disabled={!h.log} onClick={() => run(`/habits/${h.id}/undo`, 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
+            <button disabled={!h.log || h.log.pending} onClick={() => run(`/habits/${h.id}/undo`, habitUndoPatch(h.id), 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
               <Undo2 size={13} /> Undo
             </button>
           ) : confirm === 'fail' ? (
             <>
-              <button onClick={() => { setConfirm(null); setOptimistic('failed'); run(`/habits/${h.id}/fail`, `−${h.xpLoss} XP. Rise again tomorrow.`, 'bad', 'POST', rollback); }}
+              <button onClick={() => { setConfirm(null); run(`/habits/${h.id}/fail`, habitPatch(h.id, 'failed'), `−${h.xpLoss} XP. Rise again tomorrow.`, 'bad'); }}
                 className="flex-1 rounded-xl border border-bad/50 bg-bad/15 py-2 text-sm font-bold text-bad">Confirm fail</button>
               <button onClick={() => setConfirm(null)} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink2">Cancel</button>
             </>
           ) : confirm === 'complete' ? (
             <>
-              <button onClick={() => { setConfirm(null); setOptimistic('done'); run(`/habits/${h.id}/complete`, `+${h.xpGain} XP`, 'good', 'POST', rollback); }}
+              <button onClick={() => { setConfirm(null); run(`/habits/${h.id}/complete`, habitPatch(h.id, 'done'), `+${h.xpGain} XP`, 'good'); }}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/60 bg-good/20 py-2 text-sm font-bold text-good">
                 <Check size={16} /> Confirm complete (+{h.xpGain} XP)
               </button>
@@ -182,8 +172,7 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
   const [confirm, setConfirm] = useState<null | 'clear' | 'fail' | 'delete'>(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
   const unlock = () => setUnlockOpen(true);
-  const [optimistic, setOptimistic, rollback] = useOptimistic<'done' | 'failed'>(q.status);
-  const status = optimistic ?? q.status;
+  const status = q.status;
   const pending = status === 'pending';
   const isBoss = q.boss !== 'none';
   return (
@@ -222,14 +211,14 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
 
         <div className="mt-3 flex gap-2" onClick={stop}>
           {!pending ? (
-            q.canUndo && !optimistic && (
-              <button onClick={() => run(`/quests/${q.id}/undo`, 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
+            q.canUndo && (
+              <button onClick={() => run(`/quests/${q.id}/undo`, null, 'Undone')} className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink">
                 <Undo2 size={13} /> Undo
               </button>
             )
           ) : confirm === 'clear' ? (
             <>
-              <button onClick={() => { setConfirm(null); setOptimistic('done'); run(`/quests/${q.id}/complete`, `Quest cleared! +${q.xp} XP`, 'good', 'POST', rollback); }}
+              <button onClick={() => { setConfirm(null); run(`/quests/${q.id}/complete`, questPatch(q.id, 'done'), `Quest cleared! +${q.xp} XP`, 'good'); }}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-good/60 bg-good/20 py-2 text-sm font-bold text-good">
                 <Check size={16} /> Confirm clear (+{q.xp} XP)
               </button>
@@ -240,8 +229,8 @@ export function QuestCard({ s, q, onOpen, onEdit }: CardProps & { q: Quest }) {
               <button
                 onClick={() => {
                   setConfirm(null);
-                  if (confirm === 'fail') { setOptimistic('failed'); run(`/quests/${q.id}/fail`, `Quest abandoned. −${q.xp} XP`, 'bad', 'POST', rollback); }
-                  else run(`/quests/${q.id}`, 'Quest removed', 'info', 'DELETE');
+                  if (confirm === 'fail') run(`/quests/${q.id}/fail`, questPatch(q.id, 'failed'), `Quest abandoned. −${q.xp} XP`, 'bad');
+                  else run(`/quests/${q.id}`, questRemovePatch(q.id), 'Quest removed', 'info', 'DELETE');
                 }}
                 className="flex-1 rounded-xl border border-bad/50 bg-bad/15 py-2 text-sm font-bold text-bad">
                 {confirm === 'fail' ? `Abandon (−${q.xp} XP)` : 'Remove, no penalty'}
